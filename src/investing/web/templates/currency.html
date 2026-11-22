@@ -17,8 +17,16 @@
 <form class="fx-form" action="/currency#calc" method="get">
   <div class="form-group"><label for="amount">Amount in rupees</label>
     <input id="amount" name="amount" type="number" min="1" step="any" value="{{ '%g'|format(fx.amount) }}"></div>
-  <div class="form-group"><label for="month">Converted in</label>
-    <input id="month" name="month" type="month" min="{{ fx.first }}" max="{{ fx.latest_start }}" value="{{ fx.month }}"></div>
+  <div class="form-group"><label for="month-m">Converted in</label>
+    <div class="month-pick" data-min="{{ fx.first }}" data-max="{{ fx.latest_start }}">
+      <select id="month-m" aria-label="Month">{% for name in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+        <option value="{{ '%02d'|format(loop.index) }}"{% if fx.month[5:7]|int == loop.index %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      <select id="month-y" aria-label="Year">{% for y in range(fx.latest_start[:4]|int, fx.first[:4]|int - 1, -1) %}
+        <option{% if fx.month[:4]|int == y %} selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+      <input type="hidden" name="month" value="{{ fx.month }}">
+    </div></div>
   <div class="form-group"><label for="ccy">Into</label>
     <select id="ccy" name="ccy">{% for c in fx.currencies %}
       <option value="{{ c.code }}"{% if c.code == fx.code %} selected{% endif %}>{{ c.code }}, {{ c.name }}</option>{% endfor %}
@@ -95,4 +103,26 @@
     one is the BLS's.</li>
   <li>Exchange rates and past inflation only. Not investment advice, and not a view on any currency.</li>
 </ul>
+{% endblock %}
+{% block tail %}
+<script>
+document.querySelectorAll(".month-pick").forEach((pick) => {
+  const [month, year] = pick.querySelectorAll("select");
+  const hidden = pick.querySelector("input");
+  const { min, max } = pick.dataset;
+  const sync = () => {
+    for (const o of month.options) {
+      const value = `${year.value}-${o.value}`;
+      o.disabled = value < min || value > max;
+    }
+    if (month.selectedOptions[0].disabled) {
+      month.value = [...month.options].find((o) => !o.disabled).value;
+    }
+    hidden.value = `${year.value}-${month.value}`;
+  };
+  month.addEventListener("change", sync);
+  year.addEventListener("change", sync);
+  sync();
+});
+</script>
 {% endblock %}
