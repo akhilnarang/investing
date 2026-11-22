@@ -1,6 +1,7 @@
 {% extends "site_base.html" %}
 {% block title %}Currency returns in rupees{% endblock %}
 {% block body %}
+{% set amount_text = '{:f}'.format(fx.amount).rstrip('0').rstrip('.') if fx.amount is defined else '' %}
 <h1>What holding a currency did to your money</h1>
 <p class="sub">Every major currency against the rupee since {{ fx.first_label or '2000' }}, from the European
   Central Bank's daily reference rates. The rupee has fallen against most of them, which is easy to read
@@ -16,7 +17,7 @@
 {# A GET form, so every answer is a shareable link. #}
 <form class="fx-form" action="/currency#calc" method="get">
   <div class="form-group"><label for="amount">Amount in rupees</label>
-    <input id="amount" name="amount" type="number" min="1" step="any" value="{{ '%g'|format(fx.amount) }}"></div>
+    <input id="amount" name="amount" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*" value="{{ amount_text }}"></div>
   <div class="form-group"><label for="month-m">Converted in</label>
     <div class="month-pick" data-min="{{ fx.first }}" data-max="{{ fx.latest_start }}">
       <select id="month-m" aria-label="Month">{% for name in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
@@ -56,7 +57,7 @@
 <p class="sub">Rupees per unit today, and the annualised change since {{ fx.first_label }}. Pick a card to put
   that currency in the calculator above.</p>
 <div class="cards fx-cards">{% for c in fx.cards %}
-  <a class="card" href="/currency?ccy={{ c.code }}&amp;amount={{ '%g'|format(fx.amount) }}&amp;month={{ fx.month }}#calc">
+  <a class="card" href="/currency?ccy={{ c.code }}&amp;amount={{ amount_text }}&amp;month={{ fx.month }}#calc">
     <p>{{ c.code }}, {{ c.name }}</p>
     <div class="big">₹{{ '%.4f'|format(c.now) if c.now < 1 else '%.2f'|format(c.now) }}</div>
     <p>{{ '%+.1f%%'|format(c.cagr) if c.cagr is not none else 'n/a' }} a year against the rupee since {{ fx.first_label }}</p>
