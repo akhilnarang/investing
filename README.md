@@ -11,7 +11,7 @@ Needs Linux, Python 3.15 and [uv](https://docs.astral.sh/uv/). Prospectus analys
     uv sync
     cp .env.example .env          # optional: every key has a default
     uv run python scripts/refresh.py --daily
-    uv run fastapi dev
+    uv run uvicorn investing.web.app:app --reload
 
 The first refresh pulls the full AMFI NAV history and takes about an hour. `uv run pytest` does not
 need it; it builds a small seeded database.

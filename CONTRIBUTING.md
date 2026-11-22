@@ -3,7 +3,7 @@
     uv sync                       # once
     uv run pytest                 # no network
     uv run ruff check
-    uv run fastapi dev            # http://127.0.0.1:8000
+    uv run uvicorn investing.web.app:app --reload   # http://127.0.0.1:8000
 
 `python3 -m pytest` does not work: the API and prospectus modules need the project's dependencies.
 
