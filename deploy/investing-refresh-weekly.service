@@ -1,0 +1,14 @@
+[Unit]
+Description=Investing data refresh (weekly)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+ExecStart=%h/.local/bin/uv run --frozen --no-dev python scripts/refresh.py --weekly
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-@ROOT@/.env
+TimeoutStartSec=4h
+Nice=10
+IOSchedulingClass=idle

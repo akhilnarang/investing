@@ -1,0 +1,19 @@
+{% extends "site_base.html" %}
+{% block title %}IPOs{% endblock %}
+{% block body %}
+<h1>IPOs</h1>
+<p class="sub">Prospectus analysis and allotment lookup.</p>
+<div class="cards">
+  <a class="card" href="/ipo/rhp"><h3>Prospectus analysis</h3><p>Extract facts from an RHP or DRHP with the page each one came from.</p></a>
+  <a class="card" href="/ipo/allotment"><h3>Allotment</h3><p>Check an allotment across registrars.</p></a>
+</div>
+{% if linked %}
+<h2>Analyzed companies that have since listed</h2>
+<div class="scroll-x" data-cols="2"><table>
+  <thead><tr><th>Company</th><th>ISIN</th></tr></thead>
+  <tbody>{% for r in linked %}
+    <tr><td>{{ r.company_name }}</td><td><a href="/stocks/{{ r.isin }}">{{ r.isin }}</a></td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

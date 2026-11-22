@@ -1,0 +1,388 @@
+/* Plain and dense: one accent colour, borders instead of shadows, no library. */
+:root {
+  --bg: #fff; --fg: #1a1a1a; --dim: #6b7280; --line: #e5e7eb;
+  --blue: #2b6cb8; --up: #0f7a4d; --down: #c02f2f; --panel: #fafafa;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171c; --fg: #e8eaed; --dim: #9aa3ad; --line: #272c34;
+    --blue: #7ab3ea; --up: #4ecb8e; --down: #f07a7a; --panel: #1a1e24;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+/* body > header: report pages and analysis cards have their own <header> elements. */
+body > header {
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  padding: 0 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5;
+}
+.brand { font-weight: 600; padding: 14px 0; text-decoration: none; color: var(--fg); }
+nav { display: flex; gap: 18px; }
+nav a { padding: 14px 0; text-decoration: none; color: var(--dim); border-bottom: 2px solid transparent; }
+nav a:hover { color: var(--fg); }
+nav a.on { color: var(--blue); border-bottom-color: var(--blue); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+footer {
+  max-width: 1100px; margin: 0 auto; padding: 16px; border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; color: var(--dim); font-size: 12px;
+}
+footer a { color: var(--dim); }
+h1 { font-size: 21px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; }
+.sub { color: var(--dim); margin: 0 0 20px; }
+/* Per-category caveats, styled as body text rather than a bulleted menu. */
+.notes { padding-left: 18px; max-width: 70ch; }
+.notes li { margin-bottom: 7px; }
+a { color: var(--blue); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); font-weight: 600; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--panel); }
+.up { color: var(--up); } .down { color: var(--down); }
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.card { border: 1px solid var(--line); border-radius: 6px; padding: 16px; text-decoration: none; color: inherit; display: block; }
+.card:hover { border-color: var(--blue); }
+.card h3 { margin: 0 0 6px; font-size: 15px; }
+.card p { margin: 0; color: var(--dim); font-size: 13px; }
+.big { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.search { width: 100%; max-width: 420px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 5px;
+          background: var(--bg); color: var(--fg); font-size: 14px; }
+.tag { display: inline-block; font-size: 11px; color: var(--dim); border: 1px solid var(--line);
+       border-radius: 3px; padding: 1px 6px; margin-left: 6px; }
+/* .tag outranks the bare `a` rule, so restore the link colour. */
+a.tag { color: var(--blue); text-decoration: none; }
+a.tag:hover { border-color: var(--blue); }
+.empty { color: var(--dim); padding: 30px 0; }
+
+/* ---------------------------------------------------------------- shared with the IPO pages
+   The classes the prospectus templates use, in this site's tokens. */
+.page-shell { max-width: 1100px; margin: 0 auto; padding: 0; }
+.hstack { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.justify-between { justify-content: space-between; }
+.text-light { color: var(--dim); }
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 3px;
+  border: 1px solid var(--line); color: var(--dim);
+}
+.button {
+  display: inline-block; padding: 8px 14px; border-radius: 5px; border: 1px solid var(--blue);
+  background: var(--blue); color: #fff; font-size: 13px; cursor: pointer; text-decoration: none;
+}
+.button:hover { filter: brightness(1.06); }
+.button.outline, .button.ghost { background: transparent; color: var(--blue); }
+.button.ghost { border-color: var(--line); color: var(--dim); }
+.button.small { padding: 5px 10px; font-size: 12px; }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.form-group { margin: 0 0 16px; display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 12px; color: var(--dim); font-weight: 600; }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--bg); color: var(--fg); font: inherit; font-size: 14px;
+}
+/* Scroll sideways: each option is one unwrappable line, longer than a phone is wide. */
+.form-group select[multiple] { min-height: 150px; overflow-x: auto; }
+:is(input, select, textarea, button, a):focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px;
+}
+
+
+/* ---------------------------------------------------------------- layout fixes */
+
+/* Scroll wide tables inside their wrapper so the page and sticky header do not scroll sideways. */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.stat-row { gap: 34px; align-items: flex-end; margin: 4px 0 18px; }
+.stat { display: flex; flex-direction: column; }
+.stat .sub { margin: 0; font-size: 12px; }
+.stat .big { line-height: 1.15; }
+
+nav a.on, .sub a.on { color: var(--blue); font-weight: 600; }
+
+/* Arrows as well as colour, so direction does not depend on colour alone. */
+.up::before { content: "▲ "; font-size: .8em; }
+.down::before { content: "▼ "; font-size: .8em; }
+th .tag { text-transform: none; letter-spacing: 0; }
+
+@media (max-width: 620px) {
+  /* The nav scrolls sideways on one line instead of wrapping and growing the sticky header. */
+  body > header { gap: 0; padding: 0 12px; align-items: stretch; }
+  .brand { padding: 9px 0; font-size: 13px; }
+  nav {
+    gap: 16px; overflow-x: auto; width: 100%; order: 2;
+    border-top: 1px solid var(--line); scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  nav a { padding: 9px 0; white-space: nowrap; font-size: 13px; }
+
+  main { padding: 16px 12px 40px; }
+  h1 { font-size: 19px; }
+
+  /* Two columns keep the headline stats above the fold. */
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  .stat .big { font-size: 20px; }
+  .stat .sub {
+    font-size: 11px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .cards { grid-template-columns: 1fr; }
+  th, td { padding: 8px 8px; }
+  footer { flex-direction: column; gap: 6px; padding: 14px 12px; }
+}
+
+@media print {
+  /* body > header, so a report's or card's own <header> is not hidden. */
+  body > header, footer, form, .tag { display: none; }
+  main { max-width: none; padding: 0; }
+  a { color: inherit; text-decoration: none; }
+}
+
+.pills { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; margin: 0 0 14px; scrollbar-width: thin; }
+.pills a {
+  flex: none; padding: 4px 10px; border: 1px solid var(--line); border-radius: 4px;
+  font-size: 12px; color: var(--dim); text-decoration: none; white-space: nowrap;
+}
+.pills a:hover { border-color: var(--blue); color: var(--blue); }
+.pills a.on { border-color: var(--blue); color: var(--blue); font-weight: 600; }
+
+td a { text-decoration: none; }
+td a:hover { text-decoration: underline; }
+@media (max-width: 620px) {
+  /* The minimum width scales with the column count the template sets on the wrapper. 720px is
+     the widest rung and the default, so an unlisted count still scrolls. */
+  .scroll-x table { min-width: 720px; }
+  .scroll-x[data-cols="1"] table,
+  .scroll-x[data-cols="2"] table,
+  .scroll-x[data-cols="3"] table { min-width: 100%; }
+  .scroll-x[data-cols="4"] table { min-width: 520px; }
+  .scroll-x[data-cols="5"] table { min-width: 640px; }
+  .scroll-x[data-cols="6"] table { min-width: 680px; }
+  .scroll-x[data-cols="7"] table,
+  .scroll-x[data-cols="8"] table { min-width: 700px; }
+
+  /* With auto layout the extra width goes to the number columns, so give the first text columns
+     a minimum width. Only on tables wide enough to scroll, and not on `.n` number columns. */
+  .scroll-x[data-cols]:not([data-cols="1"]):not([data-cols="2"]):not([data-cols="3"])
+    :is(th, td):first-child:not(.n) { min-width: 230px; }
+  .scroll-x[data-cols]:not([data-cols="1"]):not([data-cols="2"]):not([data-cols="3"])
+    :is(th, td):nth-child(2):not(.n) { min-width: 130px; }
+}
+
+/* The caret shows only on the active sort column. */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--blue); }
+th.sortable[aria-sort="ascending"], th.sortable[aria-sort="descending"] { color: var(--blue); }
+th.sortable[aria-sort="ascending"]::after { content: " \2191"; }
+th.sortable[aria-sort="descending"]::after { content: " \2193"; }
+
+/* ---------------------------------------------------------------- the IPO pages */
+.page-shell { width: 100%; margin-inline: auto; }
+/* The top margin and rule separate the list from the filter box above it. The padding matches
+   the gap between cards. */
+.job-list { display: grid; gap: 14px; margin: 18px 0 0; list-style: none;
+            border-top: 1px solid var(--line); padding: 14px 0 0; }
+.job-list li { margin: 0; }
+
+/* The report's table of contents. The template renders both the sidebar and the <details>;
+   exactly one shows, switched at the 620px breakpoint. Desktop: a sticky sidebar. */
+.report-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: start; }
+.report-layout-single { grid-template-columns: minmax(0, 1fr); }
+.report-main { min-width: 0; }
+/* Stated so a bare `header { display: flex }` rule cannot catch it. */
+.report-header { display: block; margin: 0 0 28px; }
+.report-title { margin: 0 0 8px; font-size: 24px; line-height: 1.25; }
+.report-summary { margin: 0 0 8px; color: var(--dim); }
+.report-toc-sidebar { position: sticky; top: 76px; max-height: calc(100vh - 110px); overflow-y: auto; }
+.report-toc-mobile { display: none; }
+.report-toc-title { margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--dim);
+                    text-transform: uppercase; letter-spacing: 0.04em; }
+/* Override the site's bare `nav { display: flex }`. */
+.report-toc { display: block; }
+.report-toc ol { display: grid; gap: 7px; margin: 0; padding: 0 0 0 12px;
+                 border-left: 1px solid var(--line); list-style: none; }
+.report-toc li { margin: 0; }
+.report-toc-level-3 { padding-inline-start: 12px; }
+.report-toc a { display: block; color: var(--dim); font-size: 13px; line-height: 1.35; text-decoration: none; }
+.report-toc a:hover { color: var(--fg); }
+.report-toc a[aria-current="location"] { color: var(--blue); font-weight: 600; }
+/* Keep the sticky header from covering the heading a TOC link jumps to. */
+.report h2[id], .report h3[id] { scroll-margin-top: 64px; }
+
+/* Below the breakpoint, the TOC collapses above the report. */
+@media (max-width: 620px) {
+  .report-layout { display: block; }
+  .report-toc-sidebar { display: none; }
+  .report-toc-mobile {
+    display: block; margin: 0 0 20px; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--panel);
+  }
+  .report-toc-mobile summary { cursor: pointer; font-weight: 600; }
+  .report-toc-mobile .report-toc { margin-top: 14px; }
+}
+.job-list article {
+  border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; background: var(--bg);
+}
+.job-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.job-title { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.job-status { flex: none; }
+.job-meta { color: var(--dim); font-size: 12px; margin: 6px 0 0; }
+.job-list article > footer {
+  margin: 12px 0 0; padding: 0; border: 0; max-width: none; display: block;
+}
+.analysis-state { max-width: 680px; margin: 8vh auto 0; text-align: center; }
+
+/* /compare/{slug}: per-fund notes under the table, in native <details> so they work without JS. */
+.fund-details details { border-bottom: 1px solid var(--line); padding: 8px 0; }
+.fund-details summary { cursor: pointer; font-weight: 600; }
+.fund-details summary:hover { color: var(--blue); }
+.fund-details p { max-width: 75ch; margin: 8px 0 0; }
+.fund-details p.sub { font-size: 13px; }
+
+/* ---------------------------------------------------------------- currency calculator, SIF tracker */
+
+/* The calculator's inputs and button on one wrapping row. */
+.fx-form { display: flex; flex-wrap: wrap; gap: 0 14px; align-items: flex-end; }
+.fx-form .form-group { min-width: 140px; }
+.fx-form :is(input, select, .button) { height: 38px; }
+.fx-answer { border: 1px solid var(--line); border-radius: 6px; padding: 16px; margin: 4px 0 8px; }
+.fx-answer .sub { margin: 4px 0 12px; }
+.fx-answer td:first-child { color: var(--dim); }
+.fx-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.fx-cards .card { padding: 12px 14px; }
+.fx-cards .big { font-size: 22px; }
+
+/* A SIF's detail panel, inline above the table. */
+.sif-detail { border: 1px solid var(--line); border-radius: 6px; padding: 4px 16px 12px; margin: 8px 0 24px; }
+.sif-detail h2 { margin: 14px 0 4px; }
+.sif-detail h3 { font-size: 13px; margin: 20px 0 8px; }
+.sif-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 0 28px; }
+.sif-dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 16px; margin: 0 0 10px; font-size: 13px; }
+.sif-dl dt { color: var(--dim); }
+.sif-dl dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.sif-detail > .sif-dl { max-width: 460px; }
+.sif-book { max-height: 340px; overflow-y: auto; }
+.sif-pf { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.sif-table tr.on { background: var(--panel); }
+svg.spark { display: block; width: 100%; height: 140px; }
+
+@media (max-width: 620px) {
+  /* Hide the terms columns on a phone so the returns are reachable without scrolling. */
+  .sif-table .opt { display: none; }
+  .sif-detail { padding: 2px 12px 10px; }
+}
+
+/* Keep the sticky header from covering a linked #fund or #calc. */
+.sif-detail, #calc, #launches { scroll-margin-top: 90px; }
+
+/* ---------------------------------------------------------------- /portfolio
+   Prefixed pf- so these rules do not leak into other pages. */
+.pf-upload { margin: 0 0 8px; }
+/* Use the full width for the wide holdings table. Scoped to this page by :has(). */
+main:has(> .pf-upload) { max-width: 1440px; }
+.pf-drop {
+  display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; cursor: pointer;
+  padding: 22px 16px; border: 1px dashed var(--line); border-radius: 6px; background: var(--panel);
+}
+.pf-drop:hover, .pf-drop.over, .pf-drop:focus-within { border-color: var(--blue); }
+.pf-drop span { color: var(--dim); font-size: 13px; }
+/* Visually hidden but focusable: the label is the control. */
+.pf-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.pf-private { border-left: 3px solid var(--up); padding: 6px 12px; margin: 12px 0; max-width: 80ch; }
+/* .button sets display, which overrides the hidden attribute. */
+.pf-upload .button[hidden] { display: none; }
+.pf-status { color: var(--dim); min-height: 20px; margin: 8px 0; }
+.pf-status progress { display: block; width: 100%; max-width: 420px; height: 6px; }
+.pf-status ul, .pf-warn ul { margin: 4px 0 0; padding-left: 18px; }
+.pf-warn { border-left: 3px solid var(--down); padding: 8px 12px; margin: 10px 0; color: var(--dim); font-size: 13px; }
+
+/* The headline stats, in a wrapping grid since there can be eight. */
+.pf-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px 24px; align-items: start; }
+.pf-kpis .big { font-size: 22px; }
+.pf-kpis .big.up::before, .pf-kpis .big.down::before { font-size: .55em; vertical-align: .2em; }
+
+.pf-name { min-width: 220px; max-width: 320px; }
+/* Flex inside the cell: a flex td stops being a table cell. */
+.pf-nmrow { display: flex; gap: 8px; align-items: flex-start; }
+.pf-inc input { margin: 3px 0 0; accent-color: var(--blue); }
+td small, .pf-menu small { color: var(--dim); font-size: 11.5px; }
+#pos td, #closed td { vertical-align: top; }
+/* A floor so these explanatory cells do not wrap to one word per line. */
+#pos td:nth-child(9), #pos td:nth-child(10) { min-width: 130px; }
+#pos td:nth-child(11) { min-width: 200px; }
+#pos td:nth-child(2) { white-space: nowrap; }
+#pos td.n, #closed td.n { white-space: nowrap; }
+tr.pf-off td { opacity: .45; }
+/* A button styled as a link; it opens the dialog. */
+.pf-link {
+  border: 0; background: none; padding: 0; font: inherit; color: var(--blue); cursor: pointer; text-align: left;
+}
+.pf-link:hover { text-decoration: underline; }
+
+.pills button {
+  flex: none; border: 1px solid var(--line); background: var(--bg); color: var(--dim); border-radius: 4px;
+  padding: 3px 9px; font: inherit; font-size: 12px; cursor: pointer; max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pills button[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); }
+.pf-pick { position: relative; max-width: 420px; margin: 12px 0 8px; }
+.pf-menu {
+  position: absolute; left: 0; right: 0; top: 40px; z-index: 6; max-height: 320px; overflow: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 5px;
+}
+.pf-menu button {
+  display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px;
+  font: inherit; font-size: 13px; color: var(--fg); cursor: pointer;
+}
+.pf-menu button small { display: block; }
+.pf-menu button.on, .pf-menu button:hover { background: var(--panel); }
+.pf-menu button.pf-too-young { color: var(--dim); cursor: not-allowed; }
+.pf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.pf-chips .tag { margin: 0; font-size: 12px; }
+.pf-chips button { border: 0; background: none; color: var(--dim); cursor: pointer; font-size: 14px; padding: 0 2px; }
+
+.pf-chart svg { display: block; width: 100%; height: auto; }
+.pf-chart path { fill: none; stroke-width: 1.8; }
+.pf-axis line { stroke: var(--line); }
+.pf-axis text { fill: var(--dim); font-size: 11px; }
+.pf-hover { stroke: var(--dim); }
+.pf-fl { stroke: var(--blue); }
+.pf-fl.pf-direct { stroke: var(--up); }
+.pf-bl { stroke: var(--fg); stroke-dasharray: 5 4; }
+.pf-inv { stroke: var(--dim); stroke-width: 1 !important; stroke-dasharray: 2 3; }
+.pf-readout { color: var(--dim); font-size: 12px; min-height: 18px; margin: 4px 0; }
+.pf-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--dim); font-size: 12px; }
+.pf-sw { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--blue); }
+.pf-sw.pf-direct { background: var(--up); }
+.pf-sw.pf-bl { background: none; border-top: 2px dashed var(--fg); height: 0; }
+.pf-sw.pf-inv { background: none; border-top: 1px dashed var(--dim); height: 0; }
+#pos .pf-sw, #cmp .pf-sw, .pf-chips .pf-sw { width: 10px; height: 10px; border-radius: 2px; }
+
+/* The detail view: a modal <dialog> on the right, full screen on a phone. */
+.pf-drawer {
+  margin: 0 0 0 auto; height: 100vh; max-height: none; width: min(860px, 100vw); max-width: 100vw;
+  border: 0; border-left: 1px solid var(--line); padding: 20px; background: var(--bg); color: var(--fg); overflow-y: auto;
+}
+.pf-drawer::backdrop { background: rgb(0 0 0 / .35); }
+.pf-drawer h2 { margin: 0 0 4px; font-size: 18px; }
+.pf-drawer h3 { font-size: 14px; margin: 22px 0 8px; }
+.pf-drawer .sub { margin: 0 0 6px; }
+.pf-dhead { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.pf-dnav { display: flex; gap: 6px; flex: none; }
+tr.pf-you td { background: var(--panel); }
+
+@media (max-width: 620px) {
+  .pf-kpis { grid-template-columns: 1fr 1fr; }
+  /* Do not clamp these labels; they say what the number is measured against. */
+  .pf-kpis .sub { display: block; overflow: visible; }
+  .pf-kpis .big { font-size: 18px; }
+  .pf-name { min-width: 170px; }
+  .pf-drawer { padding: 14px 12px; }
+  .pf-dhead { flex-direction: column; }
+}
+
+/* Space between the /slb search box and the price row. */
+.slb-form { margin-bottom: 1.25rem; }

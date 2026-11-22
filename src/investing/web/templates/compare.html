@@ -1,0 +1,24 @@
+{% extends "site_base.html" %}
+{% block title %}Category comparisons{% endblock %}
+{% block body %}
+<h1>Category comparisons</h1>
+<p class="sub">Every fund in a category over its longest common history, against the index it is
+  measured by. Computed as of {{ as_of }}.</p>
+<p class="sub">One row per category. Each is computed for both plans where both exist; the count
+  and the link are the direct plan, which is what a self-directed investor buys.</p>
+<p class="sub">Active share is the median actively managed fund's distance from its index today; selection is
+  the median fund's return beyond a passive large, mid and small cap mix over the last ten years, after fees.
+  Blank where a category has no index fund to weigh against or no cap-index regression makes sense.</p>
+<div class="scroll-x" data-cols="6"><table>
+  <thead><tr><th>Category</th><th class="n">Funds</th><th>Plans</th><th>Benchmark</th>
+    <th class="n">Active share</th><th class="n">Selection</th></tr></thead>
+  <tbody>{% for c in categories %}
+    <tr><td><a href="/compare/{{ c.slug }}">{{ c.label }}</a></td>
+        <td class="n">{{ c.funds }}</td>
+        <td>{% for p, slug in c.plans.items() %}<a href="/compare/{{ slug }}">{{ p }}</a>{{ ' · ' if not loop.last }}{% endfor %}</td>
+        <td>{{ c.benchmark.name if c.benchmark is mapping else (c.benchmark or '') }}</td>
+        <td class="n">{{ '%.0f%%'|format(c.active_share) if c.active_share is number else '' }}</td>
+        <td class="n">{{ '%+.2f'|format(c.selection) if c.selection is number else '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endblock %}

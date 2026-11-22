@@ -1,0 +1,399 @@
+{% extends "site_base.html" %}
+{% block title %}IPO allotment status{% endblock %}
+{% block body %}
+<section class="page-shell">
+  <h1>IPO allotment status</h1>
+  <p class="text-light">
+    Select one or more issues (tap to add on a phone, Ctrl/Cmd-click on desktop), enter one PAN or several separated by commas, and the service asks the
+    registrar directly. PANs are never stored on the server or sent to a model. This browser keeps them only if you tick
+    the box below the field.
+  </p>
+
+  <form id="allotment-form" class="allotment-form" autocomplete="off">
+    <div class="form-group">
+      <label for="company-filter">Companies or IPOs</label>
+      <input
+        id="company-filter"
+        type="search"
+        placeholder="Search by company or issuer name"
+      >
+      <select id="provider-filter" aria-label="Filter by registrar">
+        <option value="">All registrars</option>
+      </select>
+      <select id="issue-select" name="issue_id" multiple size="8"></select>
+      <small class="text-light" id="issue-meta"></small>
+    </div>
+    <div class="form-group">
+      <label for="pan-input">Applicant PANs</label>
+      <input
+        id="pan-input"
+        name="pan"
+        type="text"
+        required
+        pattern="\s*[A-Za-z]{5}[0-9]{4}[A-Za-z]([\s,]+[A-Za-z]{5}[0-9]{4}[A-Za-z])*[\s,]*"
+        title="One PAN, or several separated by commas"
+        placeholder="ABCDE1234F, PQRST5678Z"
+        autocapitalize="characters"
+        spellcheck="false"
+      >
+      <label class="hstack" for="remember-pans">
+        <input id="remember-pans" type="checkbox">
+        Remember these PANs in this browser
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="recheck-select">Recheck unfinished results</label>
+      <select id="recheck-select">
+        <option value="0">Off</option>
+        <option value="5">Every 5 minutes</option>
+        <option value="15">Every 15 minutes</option>
+        <option value="30">Every 30 minutes</option>
+      </select>
+      <small class="text-light">Only while this tab stays open. Allotted, not allotted and not found results are not rechecked.</small>
+    </div>
+    <nav class="hstack">
+      <button id="lookup-button" class="button" type="submit">Check status</button>
+      <a class="button ghost" href="{{ url_for('home') }}">Back</a>
+    </nav>
+  </form>
+
+  <p id="allotment-error" class="allotment-error" role="alert" hidden></p>
+  <div id="allotment-results"></div>
+
+  <section class="allotment-providers">
+    <h3>Registrars</h3>
+    <ul>
+      {% for provider in providers %}
+      <li>
+        <a href="{{ provider.status_page_url }}" rel="noopener noreferrer">
+          {{ provider.label }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</section>
+{% endblock %}
+{% block tail %}
+<script>
+const form = document.getElementById("allotment-form");
+const filter = document.getElementById("company-filter");
+const providerFilter = document.getElementById("provider-filter");
+const select = document.getElementById("issue-select");
+const meta = document.getElementById("issue-meta");
+const panInput = document.getElementById("pan-input");
+const errorBox = document.getElementById("allotment-error");
+const resultsBox = document.getElementById("allotment-results");
+const lookupButton = document.getElementById("lookup-button");
+const recheckSelect = document.getElementById("recheck-select");
+const PAN_STORAGE_KEY = "allotment-pans";
+const REMEMBER_STORAGE_KEY = "allotment-remember-pans";
+const rememberBox = document.getElementById("remember-pans");
+// Outcomes worth no automatic retry; challenge_required needs the registrar's own page.
+const FINAL_OUTCOMES = new Set(["allotted", "not_allotted", "not_found", "challenge_required"]);
+let recheckTimer = null;
+
+let issues = [];
+let byId = new Map();
+// Selected issue ids survive filtering, which rebuilds the option list.
+const chosen = new Set();
+
+const outcomeLabels = {
+  allotted: "Allotted",
+  not_allotted: "Not allotted",
+  not_found: "No application found",
+  pending: "Pending",
+  challenge_required: "CAPTCHA required",
+  rate_limited: "Registrar is busy",
+  provider_unavailable: "Registrar unavailable",
+  upstream_changed: "Registrar page changed",
+  upstream_error: "Lookup error",
+  ambiguous: "Several issues match",
+  not_supported: "Not supported",
+};
+
+function clearError() {
+  errorBox.hidden = true;
+  errorBox.textContent = "";
+}
+
+function showError(message) {
+  errorBox.textContent = message;
+  errorBox.hidden = false;
+}
+
+function renderOptions() {
+  const needle = filter.value.trim().toLowerCase();
+  const provider = providerFilter.value;
+  select.replaceChildren();
+  for (const issue of issues) {
+    if (provider && issue.provider !== provider) continue;
+    const haystack = (issue.company_name + " " + issue.provider_label).toLowerCase();
+    if (needle && !haystack.includes(needle)) continue;
+    const option = document.createElement("option");
+    option.value = issue.issue_id;
+    option.selected = chosen.has(issue.issue_id);
+    const closeLabel = issue.close_date ? " - closes " + issue.close_date : "";
+    option.textContent = issue.company_name + closeLabel + " - " + issue.provider_label;
+    select.append(option);
+  }
+  updateMeta();
+}
+
+function updateSelection() {
+  for (const option of select.options) {
+    if (option.selected) chosen.add(option.value);
+    else chosen.delete(option.value);
+  }
+  updateMeta();
+}
+
+function updateMeta() {
+  const selected = [...chosen].map((id) => byId.get(id)).filter(Boolean);
+  if (!selected.length) {
+    meta.textContent = "No issue selected.";
+    return;
+  }
+  const names = selected.map((issue) => issue.company_name).join(", ");
+  meta.textContent = selected.length + " selected: " + names;
+}
+
+async function loadIssues() {
+  try {
+    const response = await fetch("{{ url_for('list_allotment_issues') }}", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    issues = data.issues || [];
+    byId = new Map(issues.map((issue) => [issue.issue_id, issue]));
+    const seen = new Set();
+    for (const issue of issues) {
+      if (seen.has(issue.provider_label)) continue;
+      seen.add(issue.provider_label);
+      const option = document.createElement("option");
+      option.value = issue.provider;
+      option.textContent = issue.provider_label;
+      providerFilter.append(option);
+    }
+    renderOptions();
+    if (!issues.length) {
+      showError("No registrar catalogues are available right now.");
+    }
+  } catch (error) {
+    showError("The issue catalogue could not be loaded.");
+  }
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 429) {
+    const seconds = Number(response.headers.get("Retry-After")) || 60;
+    return {
+      outcome: "rate_limited",
+      message: "Too many lookups from this address. Try again in " + seconds + " seconds.",
+    };
+  }
+  const data = await response.json();
+  if (response.ok) return data;
+  const detail = typeof data.detail === "string" ? data.detail : "HTTP " + response.status;
+  return { outcome: "upstream_error", message: detail };
+}
+
+function addCell(row, value) {
+  const cell = document.createElement("td");
+  cell.textContent = value === null || value === undefined ? "" : String(value);
+  row.append(cell);
+}
+
+function renderRecords(records) {
+  if (!records || !records.length) return null;
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const label of ["Application", "Name", "DP ID", "Applied", "Allotted", "Remarks"]) {
+    const cell = document.createElement("th");
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const record of records) {
+    const row = document.createElement("tr");
+    addCell(row, record.application_no);
+    addCell(row, record.name);
+    addCell(row, record.dp_id);
+    addCell(row, record.applied_shares);
+    addCell(row, record.allotted_shares);
+    addCell(row, record.remarks);
+    body.append(row);
+  }
+  table.append(head, body);
+  // Scroll inside a wrapper on a phone, as the server-rendered tables do.
+  const wrap = document.createElement("div");
+  wrap.className = "scroll-x";
+  wrap.dataset.cols = "6";
+  wrap.append(table);
+  return wrap;
+}
+
+function renderResult(box, issue, data, pan) {
+  box.replaceChildren();
+  box.dataset.outcome = data.outcome;
+
+  const title = document.createElement("h3");
+  title.textContent = issue.company_name + " - " + issue.provider_label + " - " + pan;
+  const heading = document.createElement("p");
+  heading.className = "allotment-outcome";
+  heading.dataset.outcome = data.outcome;
+  heading.textContent = outcomeLabels[data.outcome] || data.outcome;
+  box.append(title, heading);
+
+  if (data.message) {
+    const message = document.createElement("p");
+    message.textContent = data.message;
+    box.append(message);
+  }
+  if (typeof data.allocated_shares === "number") {
+    const shares = document.createElement("p");
+    shares.textContent = "Allocated shares: " + data.allocated_shares;
+    box.append(shares);
+  }
+  const records = renderRecords(data.records);
+  if (records) box.append(records);
+  if (data.retry_after_seconds) {
+    const retry = document.createElement("p");
+    retry.className = "text-light";
+    retry.textContent = "Try again in about " + data.retry_after_seconds + " seconds.";
+    box.append(retry);
+  }
+  if (data.candidates && data.candidates.length) {
+    const list = document.createElement("ul");
+    for (const candidate of data.candidates) {
+      const item = document.createElement("li");
+      item.textContent = candidate.company_name + " - " + candidate.provider_label;
+      list.append(item);
+    }
+    box.append(list);
+  }
+  if (data.status_page_url) {
+    const link = document.createElement("a");
+    link.className = "button outline small";
+    link.href = data.status_page_url;
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open the registrar status page";
+    box.append(link);
+  }
+}
+
+function renderPending(box, issue, pan) {
+  box.replaceChildren();
+  const title = document.createElement("h3");
+  title.textContent = issue.company_name + " - " + issue.provider_label + " - " + pan;
+  const status = document.createElement("p");
+  status.className = "text-light";
+  status.textContent = "Checking…";
+  box.append(title, status);
+}
+
+async function lookupIssue(box, issue, pan) {
+  renderPending(box, issue, pan);
+  try {
+    const data = await postJson("{{ url_for('allotment_lookup') }}", {
+      issue_id: issue.issue_id,
+      pan,
+    });
+    renderResult(box, issue, data, pan);
+  } catch (error) {
+    renderResult(box, issue, { outcome: "upstream_error", message: "The lookup request failed." }, pan);
+  }
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const selected = [...chosen].map((id) => byId.get(id)).filter(Boolean);
+  if (!selected.length) {
+    showError("Select at least one IPO.");
+    return;
+  }
+  if (!panInput.checkValidity()) {
+    panInput.reportValidity();
+    return;
+  }
+  clearError();
+  const pans = [...new Set(panInput.value.toUpperCase().split(/[\s,]+/).filter(Boolean))];
+  resultsBox.replaceChildren();
+  lookupButton.disabled = true;
+  try {
+    // Every PAN and issue pair is looked up at once. The server limits lookups per address.
+    await Promise.all(
+      pans.flatMap((pan) =>
+        selected.map((issue) => {
+          const box = document.createElement("section");
+          box.className = "allotment-result";
+          box.dataset.issueId = issue.issue_id;
+          box.dataset.pan = pan;
+          resultsBox.append(box);
+          return lookupIssue(box, issue, pan);
+        }),
+      ),
+    );
+  } finally {
+    lookupButton.disabled = false;
+  }
+  scheduleRecheck();
+});
+
+function scheduleRecheck() {
+  clearTimeout(recheckTimer);
+  const minutes = Number(recheckSelect.value);
+  if (minutes) recheckTimer = setTimeout(recheck, minutes * 60000);
+}
+
+async function recheck() {
+  const open = [...resultsBox.children].filter(
+    (box) => !FINAL_OUTCOMES.has(box.dataset.outcome) && byId.has(box.dataset.issueId),
+  );
+  if (!open.length) return;
+  await Promise.all(
+    open.map((box) => lookupIssue(box, byId.get(box.dataset.issueId), box.dataset.pan)),
+  );
+  scheduleRecheck();
+}
+
+try {
+  if (localStorage.getItem(REMEMBER_STORAGE_KEY) === "1") {
+    rememberBox.checked = true;
+    panInput.value = localStorage.getItem(PAN_STORAGE_KEY) || "";
+  } else {
+    // Not opted in: clear any stored list.
+    localStorage.removeItem(PAN_STORAGE_KEY);
+  }
+} catch (error) {}
+function savePans() {
+  try {
+    const value = panInput.value.trim();
+    if (rememberBox.checked && value) localStorage.setItem(PAN_STORAGE_KEY, value);
+    else localStorage.removeItem(PAN_STORAGE_KEY);
+  } catch (error) {}
+}
+panInput.addEventListener("input", savePans);
+rememberBox.addEventListener("change", () => {
+  try {
+    if (rememberBox.checked) localStorage.setItem(REMEMBER_STORAGE_KEY, "1");
+    else localStorage.removeItem(REMEMBER_STORAGE_KEY);
+  } catch (error) {}
+  savePans();
+});
+recheckSelect.addEventListener("change", scheduleRecheck);
+
+select.addEventListener("change", updateSelection);
+filter.addEventListener("input", renderOptions);
+providerFilter.addEventListener("change", renderOptions);
+loadIssues();
+</script>
+{% endblock %}

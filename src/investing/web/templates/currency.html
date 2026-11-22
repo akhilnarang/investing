@@ -1,0 +1,98 @@
+{% extends "site_base.html" %}
+{% block title %}Currency returns in rupees{% endblock %}
+{% block body %}
+<h1>What holding a currency did to your money</h1>
+<p class="sub">Every major currency against the rupee since {{ fx.first_label or '2000' }}, from the European
+  Central Bank's daily reference rates. The rupee has fallen against most of them, which is easy to read
+  as free money and is not: prices rose abroad too, so a dollar held since 2000 buys less in America than
+  it did. Each answer below is given before inflation, after Indian inflation, and after the inflation of
+  the currency's own country where that figure exists.</p>
+
+{% if fx.currencies %}
+<h2 id="calc">If I had converted, what would it be worth?</h2>
+<p class="sub">Pick an amount, a month and a currency. The answer is what that money is worth today if it
+  sat in that currency and did nothing, which is the point: cash earns nothing in this calculation, and
+  neither does the rupee it came from.</p>
+{# A GET form, so every answer is a shareable link. #}
+<form class="fx-form" action="/currency#calc" method="get">
+  <div class="form-group"><label for="amount">Amount in rupees</label>
+    <input id="amount" name="amount" type="number" min="1" step="any" value="{{ '%g'|format(fx.amount) }}"></div>
+  <div class="form-group"><label for="month">Converted in</label>
+    <input id="month" name="month" type="month" min="{{ fx.first }}" max="{{ fx.latest_start }}" value="{{ fx.month }}"></div>
+  <div class="form-group"><label for="ccy">Into</label>
+    <select id="ccy" name="ccy">{% for c in fx.currencies %}
+      <option value="{{ c.code }}"{% if c.code == fx.code %} selected{% endif %}>{{ c.code }}, {{ c.name }}</option>{% endfor %}
+    </select></div>
+  <div class="form-group"><button class="button" type="submit">Show</button></div>
+</form>
+
+{% if fx.error %}<p class="empty">{{ fx.error }}</p>
+{% elif fx.answer %}{% set a = fx.answer %}
+<div class="fx-answer">
+  <div class="big">{{ inr(fx.amount) }} → {{ inr(a.now) }}</div>
+  <p class="sub">{{ '{:,.2f}'.format(a.units) }} {{ fx.code }} bought at {{ '%.4f'|format(a.rate0) }} in
+    {{ a.from_label }}, worth {{ '%.4f'|format(a.rate1) }} today.{% if a.cagr is not none %} That is
+    {{ '%+.1f%%'|format(a.cagr) }} a year over {{ '%.0f'|format(a.years) }} years, before inflation.{% endif %}</p>
+  <div class="scroll-x" data-cols="3"><table>
+    <tbody>{% for r in a.rows %}
+      <tr><td>{{ r.label }}</td>
+          <td class="n">{{ inr(r.value) if r.value is not none else r.note }}</td>
+          <td class="n {{ 'up' if r.pct is not none and r.pct > 0 else ('down' if r.pct is not none and r.pct < 0 else '') }}">{{ '%+.1f%%'|format(r.pct) if r.pct is not none else '' }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% if a.peg %}<p class="sub">{{ fx.code }} is pegged to the US dollar at {{ a.peg }}, so this tracks the dollar exactly.</p>{% endif %}
+</div>
+{% endif %}
+
+<h2 id="pairs">Every pair, and what it did</h2>
+<p class="sub">Rupees per unit today, and the annualised change since {{ fx.first_label }}. Pick a card to put
+  that currency in the calculator above.</p>
+<div class="cards fx-cards">{% for c in fx.cards %}
+  <a class="card" href="/currency?ccy={{ c.code }}&amp;amount={{ '%g'|format(fx.amount) }}&amp;month={{ fx.month }}#calc">
+    <p>{{ c.code }}, {{ c.name }}</p>
+    <div class="big">₹{{ '%.4f'|format(c.now) if c.now < 1 else '%.2f'|format(c.now) }}</div>
+    <p>{{ '%+.1f%%'|format(c.cagr) if c.cagr is not none else 'n/a' }} a year against the rupee since {{ fx.first_label }}</p>
+  </a>{% endfor %}
+</div>
+{% endif %}
+
+{% for group, rows in groups.items() %}
+  {% if rows %}
+  <h2>{{ group }}</h2>
+  <div class="scroll-x" data-cols="4"><table>
+    <thead><tr><th>Series</th><th class="n">Latest</th><th>On</th><th class="n">Points</th></tr></thead>
+    <tbody>{% for s in rows %}
+      <tr><td><a href="/currency/{{ s.name }}">{{ s.label }}</a></td>
+          <td class="n">{{ '%.4f'|format(s.latest) if s.latest is not none else '' }}</td>
+          <td>{{ s.latest_date or '' }}</td><td class="n">{{ s.count }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+{% endfor %}
+
+<h2>Reading this honestly</h2>
+<ul class="sub notes">
+  <li><b>A falling rupee is not a return.</b> If the rupee halves against the dollar over twenty years
+    while US prices double, a dollar-holder's purchasing power in America is flat. The nominal number
+    flatters; the inflation-adjusted one is the answer.</li>
+  <li><b>Cash is the floor, not the benchmark.</b> Holding any currency and doing nothing with it is the
+    worst version of every option here. The overnight rate line shows what the same rupees would have
+    done sitting in the safest Indian instrument that pays anything at all.</li>
+  <li><b>The dirham and the riyal are pegged</b> to the dollar, at 3.6725 and 3.75, so their rupee rates
+    are the dollar's divided by a constant. They move because the dollar does, not because of anything
+    happening in the Gulf.</li>
+  <li><b>Inflation here is annual and coarse.</b> The World Bank publishes one figure a year, spread
+    evenly across its months, and the current year carries the last published rate. That is the right
+    grain for a twenty-year question and the wrong grain for anything shorter.</li>
+</ul>
+<h2>Where the numbers come from</h2>
+<ul class="sub notes">
+  <li>Rates are the ECB's daily reference fixes, published at 14:15 CET, converted through the euro. They
+    are not the rate your bank gives you: a retail conversion loses 1 to 3% to the spread and the fee,
+    each way.</li>
+  <li>Month-end points only. The question is about years.</li>
+  <li>Inflation is the World Bank's CPI series for each country. The Indian one is MOSPI's, the American
+    one is the BLS's.</li>
+  <li>Exchange rates and past inflation only. Not investment advice, and not a view on any currency.</li>
+</ul>
+{% endblock %}

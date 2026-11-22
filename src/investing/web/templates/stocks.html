@@ -1,0 +1,31 @@
+{% extends "site_base.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Stocks{% endblock %}
+{% block body %}
+<h1>Stocks</h1>
+<p class="sub">{{ stats.stocks }} listed companies. Search by name or symbol.</p>
+{# data-live hooks up _live_search.html; without it this is a plain GET form. #}
+<form action="/stocks" method="get" data-live>
+  <input class="search" type="search" name="q" value="{{ q or '' }}" placeholder="RELIANCE, Infosys, ESDS..."
+         autofocus autocomplete="off" aria-controls="results">
+    <noscript><button class="button" type="submit">Search</button></noscript>
+</form>
+{# The live search swaps this element's contents. #}
+<div id="results" aria-live="polite">
+{% if q and q|trim|length >= 2 %}
+<h2>{{ results|length }} match{{ '' if results|length == 1 else 'es' }}</h2>
+{% if results %}
+<div class="scroll-x" data-cols="3"><table>
+  <thead><tr><th>Symbol</th><th>Name</th><th>ISIN</th></tr></thead>
+  <tbody>
+  {% for s in results %}
+    <tr><td><a href="/stocks/{{ s.isin }}">{{ s.symbol or '' }}</a></td><td>{{ s.name }}</td><td>{{ s.isin }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="empty">Nothing matched.</p>{% endif %}
+{% elif q %}
+<p class="empty">Type at least 2 characters.</p>
+{% endif %}
+</div>
+{% endblock %}
+{% block tail %}{% include "_live_search.html" %}{% endblock %}

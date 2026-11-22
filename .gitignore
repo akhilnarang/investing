@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Data is a build artifact, not source: rebuilt by the importers or synced.
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+# sqlite3.connect() creates a file on connect, so a wrong path leaves an empty database behind
+# rather than failing. The real one is data/investing.sqlite3.
+*.db
+/data/
+/site/
+/logs/
+
+# Personal, never committed.
+/tradebooks/
+/reports/

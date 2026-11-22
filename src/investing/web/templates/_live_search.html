@@ -1,0 +1,85 @@
+{# Search as you type for /stocks and /mf. Fetches the page the form would load and swaps in its
+   #results, so the server stays the only renderer. Without JavaScript the form submits normally. #}
+<script>
+(() => {
+  const form = document.querySelector('form[data-live]');
+  const input = form && form.querySelector('input[name=q]');
+  const out = document.getElementById('results');
+  if (!form || !input || !out) return;
+
+  const MIN = 2;                 // the server's minimum query length
+  const DEBOUNCE = 200;
+
+  let timer = 0;
+  // Only the newest request may write. abort() alone does not stop a handler already queued.
+  let seq = 0;
+  let live = null;
+
+  const base = form.getAttribute('action');
+
+  function url(q) {
+    // Keep the plan filter. Drop category, which the server would apply in place of q.
+    const p = new URLSearchParams(location.search);
+    p.delete('category');
+    if (q) p.set('q', q); else p.delete('q');
+    const s = p.toString();
+    return s ? base + '?' + s : base;
+  }
+
+  async function run(q) {
+    const mine = ++seq;
+    if (live) live.abort();
+    live = new AbortController();
+
+    const target = url(q);
+    let html;
+    try {
+      const r = await fetch(target, {signal: live.signal});
+      if (!r.ok) return;
+      html = await r.text();
+    } catch (e) {
+      return;                    // aborted, or offline: leave what is on screen
+    }
+    if (mine !== seq) return;    // a later keystroke already answered
+
+    const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('results');
+    if (fresh) out.replaceChildren(...fresh.childNodes);
+    // replaceState so each keystroke does not add a history entry.
+    history.replaceState(null, '', target);
+    out.setAttribute('aria-busy', 'false');
+  }
+
+  // Replace the previous rows with a hint, since the server returns nothing for a short query.
+  function tooShort() {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'Type at least ' + MIN + ' characters.';
+    out.replaceChildren(p);
+    history.replaceState(null, '', url(input.value.trim()));
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    out.removeAttribute('aria-busy');
+    if (!q) {
+      // An empty box fetches the bare page (the category listing on /mf).
+      timer = setTimeout(() => run(''), DEBOUNCE);
+      return;
+    }
+    if (q.length < MIN) { seq++; tooShort(); return; }
+    out.setAttribute('aria-busy', 'true');
+    timer = setTimeout(() => run(q), DEBOUNCE);
+  });
+
+  // Enter searches immediately instead of reloading the page.
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (!q) { run(''); } else if (q.length < MIN) { seq++; tooShort(); } else { run(q); }
+    // Dismiss the on-screen keyboard on a phone.
+    input.blur();
+  });
+})();
+</script>

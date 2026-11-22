@@ -1,0 +1,62 @@
+{% extends "site_base.html" %}
+{% block title %}IPO prospectus analyses{% endblock %}
+{% block body %}
+<section class="page-shell">
+  <h1>Analysis list</h1>
+  <p class="text-light">
+    {{ jobs | length }} {{ "company" if jobs | length == 1 else "companies" }}.
+    {%- if running %} An analysis is running; reload to see it finish.{% endif %}
+  </p>
+  <input id="filter" class="search" type="search" placeholder="Filter by company name"
+         aria-label="Filter by company name" autocomplete="off">
+  <p id="filter-empty" class="text-light" hidden>No company matches that.</p>
+  <ul class="job-list" id="job-list">
+    {% for job in jobs %}
+    <li data-name="{{ job.title | lower }}">
+      <article class="card">
+        <header class="job-header">
+          <h3 class="job-title">{{ job.title }}</h3>
+          <span class="badge job-status" data-variant="{{ job.variant }}">{{ job.status_label }}</span>
+        </header>
+        <p>{{ job.summary }}</p>
+        <small class="job-meta">Updated <time data-local-time datetime="{{ job.updated_at }}">{{ job.updated_label }}</time></small>
+        <footer>
+          <a class="button outline small" target="_blank" rel="noopener"
+             href="{{ url_for('analysis_page_route', analysis_id=job.public_id) }}">View analysis</a>
+        </footer>
+      </article>
+    </li>
+    {% else %}
+    <li>
+      <article class="card">
+        <p>No analyses are available.</p>
+        <p>Send a PDF or ZIP to <code>POST /api/v1/ipo/analyze</code>.</p>
+      </article>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+<script>
+  // Filter the rendered list client-side.
+  (function () {
+    const input = document.getElementById("filter");
+    const empty = document.getElementById("filter-empty");
+    if (!input) return;
+    const items = Array.from(document.querySelectorAll("#job-list > li[data-name]"));
+
+    function apply() {
+      const query = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const item of items) {
+        const match = !query || item.dataset.name.includes(query);
+        item.hidden = !match;
+        if (match) shown++;
+      }
+      if (empty) empty.hidden = shown > 0 || !query;
+    }
+
+    input.addEventListener("input", apply);
+  })();
+</script>
+{% endblock %}
+{% block tail %}<script src="/static/local_time.js?v={{ static_version }}" defer></script>{% endblock %}

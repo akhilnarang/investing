@@ -1,0 +1,125 @@
+{% extends "site_base.html" %}
+{% block title %}{{ doc.sub_category }}{% if doc.plan and doc.plan != 'direct' %} (regular){% endif %} funds compared{% endblock %}
+{% block body %}
+<h1>{{ doc.sub_category }}{% if doc.plan and doc.plan != 'direct' %} ({{ doc.plan }}){% endif %}</h1>
+<p class="sub">
+  {% if doc.min_years %}{{ doc.funds|length }} funds with at least {{ doc.min_years }} years of history.
+  {% else %}All {{ doc.funds|length }} funds on sale, the newest included. A return column is blank wherever the fund is younger than the window.
+  {% endif %}
+  {% if doc.benchmark %}Measured against {{ doc.benchmark.name if doc.benchmark is mapping else doc.benchmark }}.{% endif %}
+  As of {{ doc.as_of }}{% if short and short.as_of %}; 1W to 3M are plain returns to {{ short.as_of }}, with each fund's rank here{% endif %}.
+  {% if other_slug %}<a href="/compare/{{ other_slug }}">See the {{ other_plan }} plans</a>.{% endif %}
+</p>
+
+{% if doc.bench_stats and doc.bench_stats.cagr %}
+<div class="hstack stat-row">
+  {% for h in horizons %}{% if doc.bench_stats.cagr.get(h|string) is not none %}
+  <div class="stat"><span class="big">{{ '%.2f%%'|format(doc.bench_stats.cagr[h|string]) }}</span><span class="sub">index {{ h }}</span></div>
+  {% endif %}{% endfor %}
+</div>
+{% endif %}
+
+{# sort.js sorts on each th's data-key and each cell's data-v. #}
+{# Keyed by direct code: tilt and selection from attribution, active share from the latest
+   portfolio. A missing entry renders blank, not zero. #}
+{% set A = (attribution or {}).get('funds') or {} %}
+{% set S = (active or {}).get('funds') or {} %}
+{% set SH = (short or {}).get('funds') or {} %}
+<div class="scroll-x" data-cols="{{ horizons|length + 8 + (2 if A else 0) + (1 if S else 0) }}"><table data-sortable>
+  <thead><tr><th data-key="name">Fund</th><th data-key="house">House</th>
+    {% for w in ('1w', '1m', '3m') %}<th class="n" data-key="r{{ w }}" title="Plain return to {{ short.as_of }} and rank among the {{ short.counts[w] }} funds here with a NAV both ends">{{ w|upper }}</th>{% endfor %}
+    {% for h in horizons %}<th class="n" data-key="cagr">{{ h }}y</th>{% endfor %}
+    <th class="n" data-key="ber" title="Base expense ratio: what SEBI caps. AMFI's total TER adds one day's trading costs and levies, annualised, and swings with them.">BER</th><th class="n" data-key="history">History</th>
+    <th class="n" data-key="aum">AUM Cr</th>
+    {% if A %}<th class="n" data-key="tilt" title="What a passive large/mid/small mix with the fund's fitted weights earned over the index, pp a year">Tilt {{ attribution.years }}y</th>
+    <th class="n" data-key="selection" title="Fund return beyond that passive mix, pp a year, net of fees">Selection {{ attribution.years }}y</th>{% endif %}
+    {% if S %}<th class="n" data-key="active" title="How much of today's portfolio differs from the {{ active.index }}">Active share</th>{% endif %}</tr></thead>
+  <tbody>{% for f in doc.funds %}
+    {% set code = (f.direct_code or f.scheme_code)|string %}
+    <tr><td><a href="/mf/{{ f.scheme_code }}">{{ f.name }}</a></td>
+        <td>{{ f.fund_house or '' }}</td>
+        {% set sr = SH.get(f.scheme_code|string) or {} %}
+        {% for w in ('1w', '1m', '3m') %}{% set v = sr.get(w) %}
+        <td class="n {{ 'up' if v and v > 0 else ('down' if v and v < 0 else '') }}" data-v="{{ v if v is not none else '' }}">
+          {%- if v is not none %}{{ '%.2f%%'|format(v) }} <span class="sub">#{{ sr[w ~ '_rank'] }}</span>{% endif -%}</td>
+        {% endfor %}
+        {% for h in horizons %}
+          {# Gate on the fund's age: nav.cagr accepts a start NAV up to 12 days inside the window. #}
+          {% set v = (f.cagr or {}).get(h|string) if (f.history_years or 0) >= h else none %}
+          <td class="n {{ 'up' if v and doc.bench_stats and doc.bench_stats.cagr and doc.bench_stats.cagr.get(h|string) and v > doc.bench_stats.cagr[h|string] }}"
+              data-v="{{ v if v is not none else '' }}">{{ '%.2f%%'|format(v) if v is not none else '' }}</td>
+        {% endfor %}
+        <td class="n" data-v="{{ f.get('ber') if f.get('ber') is not none else '' }}">{{ '%.2f'|format(f.ber) if f.get('ber') is not none else '' }}</td>
+        <td class="n" data-v="{{ f.history_years or 0 }}">{{ '%.1f'|format(f.history_years) }}y</td>
+        <td class="n" data-v="{{ f.aum or '' }}">{{ '{:,.0f}'.format(f.aum) if f.aum else '' }}</td>
+        {% if A %}{% set a = A.get(code) %}
+        <td class="n" data-v="{{ a.tilt_pp if a else '' }}">{{ '%+.2f'|format(a.tilt_pp) if a else '' }}</td>
+        <td class="n {{ 'up' if a and a.selection_pp > 0 else ('down' if a and a.selection_pp < 0) }}" data-v="{{ a.selection_pp if a else '' }}">{{ '%+.2f'|format(a.selection_pp) if a else '' }}</td>
+        {% endif %}
+        {% if S %}{% set s = S.get(code) %}
+        <td class="n" data-v="{{ s.active_share_pct if s else '' }}">{{ '%.0f%%'|format(s.active_share_pct) if s else '' }}</td>
+        {% endif %}</tr>
+  {% endfor %}</tbody>
+</table></div>
+{% if doc.excluded %}
+{# With a history gate, exclusions are for history. Otherwise each excluded fund has its own
+   reason, so group by it. #}
+{% if doc.min_years %}<p class="sub">{{ doc.excluded|length }} funds excluded for too little history.</p>
+{% else %}{% for reason, group in doc.excluded|groupby('excluded') %}
+<p class="sub">{{ group|length }} not listed, {{ reason or 'not listed' }}:
+  {{ group|map(attribute='name')|join(', ') }}.</p>
+{% endfor %}{% endif %}
+{% endif %}
+{% if A or S or facts %}
+<h2>Fund by fund</h2>
+<p class="sub">{% if A %}Tilt and selection split each fund's excess return over the last {{ attribution.years }} years
+  ({{ attribution.window_start }} to {{ attribution.window_end }}) by regressing its monthly returns on the Nifty 100,
+  Midcap 150 and Smallcap 250 total-return indexes: tilt is what a passive mix with the fitted weights earned over the
+  index, selection is what the fund made beyond that mix, after fees. Below an R² of about 0.85 read both loosely.{% endif %}
+  {% if S %}Active share compares the latest disclosed portfolio with the {{ active.index }}, weighted by an index
+  fund's own holdings ({{ active.index_portfolio_date }}); it says how different the portfolio is, not whether that
+  paid.{% endif %}</p>
+<div class="fund-details">{% for f in doc.funds %}
+  {% set code = (f.direct_code or f.scheme_code)|string %}
+  {% set a = A.get(code) %}{% set s = S.get(code) %}{% set x = (facts or {}).get(code) %}
+  {% if a or s or x %}
+  <details><summary>{{ f.name }}</summary>
+    {% if a %}<p>Over {{ a.window_years }} years the fund returned <b>{{ '%.2f'|format(a.fund_cagr) }}%</b> a year
+      against {{ '%.2f'|format(a.benchmark_cagr) }}% for the index: <b>{{ '%+.2f'|format(a.excess_pp) }}</b> pp, of which
+      tilt {{ '%+.2f'|format(a.tilt_pp) }} and selection <b>{{ '%+.2f'|format(a.selection_pp) }}</b>. Fitted mix: large
+      {{ '%.0f'|format(a.beta_large * 100) }}%, mid {{ '%.0f'|format(a.beta_mid * 100) }}%, small
+      {{ '%.0f'|format(a.beta_small * 100) }}% (sum of betas {{ '%.2f'|format(a.beta_sum) }}, R²
+      {{ '%.2f'|format(a.r_squared) }}{{ ', a loose fit' if a.r_squared < 0.85 }}).</p>{% endif %}
+    {% if s %}<p>Portfolio on {{ s.as_of[:10] }}: active share <b>{{ '%.1f'|format(s.active_share_pct) }}%</b> across
+      {{ s.holdings }} stocks, {{ '%.1f'|format(s.equity_pct) }}% in equities and {{ '%.1f'|format(s.off_index_pct) }}% of
+      it outside the index. Largest position <b>{{ '%.2f'|format(s.top_pct) }}%</b>{% if s.top_holdings %}
+      ({{ s.top_holdings[0].name or s.top_holdings[0].stock }}){% endif %}, largest five {{ '%.0f'|format(s.top5_pct) }}%,
+      largest ten {{ '%.0f'|format(s.top10_pct) }}%.</p>
+    {% if s.top_overweights %}<p class="sub">Most overweight: {% for o in s.top_overweights %}{{ o.name or o.stock }}
+      {{ '%+.2f'|format(o.diff_pp) }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+    {% if s.top_underweights %}<p class="sub">Most underweight: {% for o in s.top_underweights %}{{ o.name or o.stock }}
+      {{ '%+.2f'|format(o.diff_pp) }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}{% endif %}
+    {% if x %}
+    {% if x.managers %}<p>Managed by {{ x.managers|map(attribute='name')|join(', ') }}{% if x.since %} since
+      <b>{{ x.since }}</b>, {{ '%.1f'|format(x.tenure_years) }} years{% endif %}.{% if x.benchmark %} Stated benchmark:
+      {{ x.benchmark }}.{% endif %}{% if x.turnover is not none %} Portfolio turnover {{ '%.0f'|format(x.turnover) }}%.{% endif %}</p>
+    {% elif x.benchmark %}<p>Stated benchmark: {{ x.benchmark }}.</p>{% endif %}
+    {% if x.ter_history and x.ter_history|length > 6 %}{% set t = x.ter_history %}{% set v = t|map('last')|list %}
+    <p class="sub">Expense ratio {{ '%.2f'|format(t[0][1]) }}% in {{ t[0][0] }}, {{ '%.2f'|format(t[-1][1]) }}% in
+      {{ t[-1][0] }}; between {{ '%.2f'|format(v|min) }}% and {{ '%.2f'|format(v|max) }}% over {{ t|length }} months.</p>{% endif %}
+    {% if x.mix %}{% set m = x.mix %}
+    <p class="sub">Portfolio{% if m.portfolio_date %} on {{ m.portfolio_date }}{% endif %}:
+      {% for k, l in [('sovereign', 'sovereign'), ('psu_bank', 'banks and PSUs'), ('corporate', 'other corporates'), ('cash', 'cash and derivatives'), ('equity', 'equity')] %}{% if (m[k] or 0) >= 0.5 %}{{ '%.0f'|format(m[k]) }}% {{ l }}, {% endif %}{% endfor %}{{ m.instruments }} instruments.
+      {% if m.top_issuers %}Largest borrowers: {% for i in m.top_issuers %}{{ i.name }} {{ '%.1f'|format(i.pct) }}%{{ ', ' if not loop.last }}{% endfor %}.{% endif %}</p>{% endif %}
+    {% endif %}
+  </details>
+  {% endif %}
+{% endfor %}</div>
+{% endif %}
+{% if doc.category_notes %}
+<h2>What this comparison does and does not say</h2>
+<ul class="sub notes">{% for note in doc.category_notes %}<li>{{ note }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}
+
+{% block tail %}<script src="/static/sort.js?v={{ static_version }}" defer></script>{% endblock %}

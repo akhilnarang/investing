@@ -1,0 +1,46 @@
+{% extends "site_base.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Stock lending (SLB){% endblock %}
+{% block body %}
+<h1>Stock lending (SLB)</h1>
+<p class="sub">Live bids and asks per series from NSE, refreshed every 30 seconds. Fair fee is what lending is
+  worth against selling spot, parking the cash at {{ '%g'|format(rate * 100) }}% and buying back through futures:
+  spot × (1 + rate × days/365) − the futures price at the series end.</p>
+<form action="/slb" method="get" class="slb-form">
+  <input class="search" type="search" name="q" value="{{ q or '' }}" placeholder="RELIANCE, KAYNES, M&M..."
+         autofocus autocomplete="off" autocapitalize="characters">
+  {% if rate != 0.07 %}<input type="hidden" name="rate" value="{{ rate }}">{% endif %}
+</form>
+{% if error %}<p class="empty">{{ error }}</p>
+{% elif data %}
+{% if data.series %}
+<div class="hstack stat-row">
+  <div class="stat"><span class="big">{{ '%.2f'|format(data.spot) if data.spot else '' }}</span><span class="sub">{{ q }} spot</span></div>
+  {% for f in data.futures %}<div class="stat"><span class="big">{{ '%.2f'|format(f.price) if f.price else '' }}</span><span class="sub">future {{ f.expiry }}</span></div>{% endfor %}
+  {% if data.best %}<div class="stat"><span class="big">{{ '%.2f'|format(data.best.bid) }}</span><span class="sub">best bid: {{ data.best.series }}{% if data.best.group %} {{ data.best.group }}{% endif %}, {{ data.best.bid_qty }} sh{% if data.best.yield_at_bid_pct %}, {{ '%.2f'|format(data.best.yield_at_bid_pct) }}% a yr{% endif %}</span></div>{% endif %}
+</div>
+{% if data.corporate_action %}<p class="sub">Upcoming corporate action: {{ data.corporate_action }}</p>{% endif %}
+<div class="scroll-x" data-cols="10"><table>
+  <thead><tr><th>Series</th><th class="n">Bid</th><th class="n">Bid qty</th><th class="n">Ask</th><th class="n">Ask qty</th>
+    <th class="n">Last</th><th class="n" title="At the bid: bid / spot * 365 / days">Yield at bid %</th><th class="n" title="NSE's figure, from whichever of last, ask or bid exists">NSE yield %</th>
+    <th class="n">Open</th><th class="n" title="spot * (1 + rate * days/365) - futures at the series end, interpolated">Fair fee</th></tr></thead>
+  <tbody>{% for s in data.series %}
+    <tr><td>{{ s.series }}{% if s.group %} <span class="sub">{{ s.group }} · {{ s.code }}</span>{% endif %}<br>
+        <span class="sub">ends {{ s.end_date }}, {{ s.days }}d</span></td>
+      <td class="n {{ 'up' if s.bid and s.fair_fee is not none and s.bid > s.fair_fee }}">{{ '%.2f'|format(s.bid) if s.bid else '' }}</td>
+      <td class="n">{{ s.bid_qty or '' }}</td>
+      <td class="n">{{ '%.2f'|format(s.ask) if s.ask else '' }}</td>
+      <td class="n">{{ s.ask_qty or '' }}</td>
+      <td class="n">{{ '%.2f'|format(s.last) if s.last else '' }}</td>
+      <td class="n">{{ '%.2f'|format(s.yield_at_bid_pct) if s.yield_at_bid_pct else '' }}</td>
+      <td class="n">{{ '%.2f'|format(s.annualised_yield_pct) if s.annualised_yield_pct else '' }}</td>
+      <td class="n">{{ s.open_positions or '' }}</td>
+      <td class="n">{% if s.fair_fee is not none %}{{ '%.2f'|format(s.fair_fee) }}<br><span class="sub">fut {{ '%.2f'|format(s.futures_at_end) }}</span>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+<p class="sub">NSE time {{ data.as_of }}. Series end on the first Tuesday of their month (holidays not modelled). A and B are
+  separate contracts with the same month. A green bid is above the fair fee; futures at the series end are interpolated
+  between spot and the listed expiries, and past the last expiry there is no fair fee.
+  <a href="/api/v1/slb/{{ q }}{% if rate != 0.07 %}?rate={{ rate }}{% endif %}">JSON</a></p>
+{% else %}<p class="empty">NSE lists no SLB series for {{ q }}. It may not be in the SLB segment.</p>{% endif %}
+{% endif %}
+{% endblock %}

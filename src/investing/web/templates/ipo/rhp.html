@@ -1,0 +1,89 @@
+{% extends "site_base.html" %}
+{% block title %}RHP analyser{% endblock %}
+{% block body %}
+<section class="page-shell hero">
+  <p><span class="badge">IPO research</span></p>
+  <h1>RHP Analyzer</h1>
+  <h3 class="text-light">Analyze Indian IPO RHP and DRHP files with page evidence.</h3>
+  <p>The service extracts document facts, checks source quotes, and creates a public research report.</p>
+  <nav class="hstack">
+    <a class="button" href="{{ url_for('allotment_page') }}">Check allotment</a>
+    <a class="button outline" href="{{ url_for('analysis_list') }}">Browse analyses</a>
+    <a class="button outline" href="{{ url_for('swagger_ui_html') }}">API documentation</a>
+    <a class="button ghost" href="{{ url_for('rhp_health') }}">Service health</a>
+  </nav>
+</section>
+<section class="page-shell">
+  {% if analysis_enabled %}
+  <form id="analyze-form" data-endpoint="{{ url_for('analyze') }}" autocomplete="off">
+    <h2>Analyze a prospectus</h2>
+    <div class="form-group">
+      <label for="analyze-file">PDF or ZIP file</label>
+      <input id="analyze-file" type="file" accept=".pdf,.zip">
+    </div>
+    <div class="form-group">
+      <label for="analyze-url">Or a public URL</label>
+      <input id="analyze-url" type="url" placeholder="https://example.com/rhp.pdf">
+    </div>
+    <div class="form-group">
+      <label for="analyze-token">Access token</label>
+      <input id="analyze-token" type="password" autocomplete="off" required>
+      <small class="text-light">Kept in this page only.</small>
+    </div>
+    <p id="analyze-error" role="alert" hidden></p>
+    <button id="analyze-button" class="button" type="submit">Start analysis</button>
+  </form>
+  {% else %}
+  <p>New analyses are turned off on this deployment. Existing reports stay available.</p>
+  {% endif %}
+</section>
+{% endblock %}
+{% block tail %}
+{% if analysis_enabled %}
+<script>
+const analyzeForm = document.getElementById("analyze-form");
+const analyzeError = document.getElementById("analyze-error");
+const analyzeButton = document.getElementById("analyze-button");
+
+function showAnalyzeError(message) {
+  analyzeError.textContent = message;
+  analyzeError.hidden = false;
+}
+
+analyzeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  analyzeError.hidden = true;
+  const file = document.getElementById("analyze-file").files[0];
+  const url = document.getElementById("analyze-url").value.trim();
+  if (Boolean(file) === Boolean(url)) {
+    showAnalyzeError("Choose a file or enter a URL, not both.");
+    return;
+  }
+  const body = new FormData();
+  if (file) body.append("file", file);
+  else body.append("url", url);
+  analyzeButton.disabled = true;
+  try {
+    const response = await fetch(analyzeForm.dataset.endpoint, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + document.getElementById("analyze-token").value },
+      body,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 202) {
+      window.location.href = data.url;
+      return;
+    }
+    let message = typeof data.detail === "string" ? data.detail : "HTTP " + response.status;
+    const retry = response.headers.get("Retry-After");
+    if (response.status === 429 && retry) message += " Retry-After: " + retry + " seconds.";
+    showAnalyzeError(message);
+  } catch (error) {
+    showAnalyzeError("The request failed.");
+  } finally {
+    analyzeButton.disabled = false;
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

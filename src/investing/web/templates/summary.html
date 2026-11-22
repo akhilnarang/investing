@@ -1,0 +1,87 @@
+{% extends "site_base.html" %}
+{% block title %}Every category on one page{% endblock %}
+{% block body %}
+{% set d = tables[0] %}
+<h1>Every category on one page</h1>
+<p class="sub">The median fund of each SEBI category against that category's own benchmark, on the
+  longest horizon the benchmark and its funds share: {{ groups|join(', ')|lower }}. Direct plans give
+  up to {{ d.words }} years of post-2013 evidence; regular plans stretch the same funds back to 2006
+  at the cost of a distributor's commission. Only funds that have reached a row's horizon are counted,
+  so a young category's row rests on few funds and says so{% if young %}: {{ young }} direct-plan rows are measured on a shorter horizon{% endif %}. As of {{ as_of }}.</p>
+
+<div class="hstack stat-row">
+  <div class="stat"><span class="big">{{ d.rows|length }}</span><span class="sub">categories, {{ funds }} funds with {{ d.words }} years of history</span></div>
+  <div class="stat"><span class="big">{{ beat }} / {{ with_h }}</span><span class="sub">categories whose median fund beat its benchmark over {{ d.words }} years</span></div>
+  {% if best %}<div class="stat"><span class="big">{{ '%+.1f'|format(best.excess) }} pp</span><span class="sub">widest median lead: {{ best.label }}</span></div>{% endif %}
+  {% if worst %}<div class="stat"><span class="big">{{ '%+.1f'|format(worst.excess) }} pp</span><span class="sub">narrowest, or a lag: {{ worst.label }}</span></div>{% endif %}
+</div>
+
+{% for t in tables %}
+<h2 id="{{ t.plan }}">{{ t.plan|capitalize }} plans, {{ t.words }} years</h2>
+{% if t.plan == 'direct' %}
+<p class="sub">Median of the category's funds that have the horizon; younger funds and index funds
+  are listed on the category page but not counted here, and a row measured on a shorter horizon says
+  so beside its name. "Beat it" is the share of those funds ahead of the benchmark over the trailing
+  horizon; the hit rate is the median fund's share of rolling five-year windows won. Active share and
+  selection (the median manager's return beyond a passive large, mid and small cap mix over
+  {{ sel_years }} years, after fees) are computed for domestic equity categories only.</p>
+{% else %}
+<p class="sub">The same categories on regular-plan NAVs, which run from 2006, so fewer funds qualify
+  and every return carries the commission. A category that leads here as well has done so across
+  2008, 2011, 2013 and 2020, not only over the last decade.</p>
+{% endif %}
+{# sort.js sorts on data-key and data-v; blanks sort last. #}
+<div class="scroll-x" data-cols="10"><table data-sortable>
+  <thead><tr><th data-key="name">Category</th><th data-key="bench">Benchmark</th>
+    <th class="n" data-key="funds" title="Funds with {{ t.horizon }} years of history; younger funds and index funds are not counted">Funds</th>
+    <th class="n" data-key="cagr">Median {{ t.horizon }}y CAGR</th>
+    <th class="n" data-key="bcagr">Benchmark {{ t.horizon }}y</th>
+    <th class="n" data-key="excess" title="Median fund's CAGR minus the benchmark's, percentage points a year">Median excess</th>
+    <th class="n" data-key="beat" title="Share of the funds counted that finished ahead of the benchmark">Beat it over {{ t.horizon }}y</th>
+    <th class="n" data-key="hit" title="Median fund: share of rolling five-year windows in which it beat the benchmark">Rolling 5y hit rate</th>
+    <th class="n" data-key="active" title="Median active share against the benchmark's index-fund proxy, latest portfolios">Active share</th>
+    <th class="n" data-key="sel" title="Median selection return, pp a year: what managers added beyond a passive cap mix">Selection</th></tr></thead>
+  <tbody>{% for r in t.rows %}
+    <tr><td><a href="/compare/{{ r.slug }}">{{ r.label }}</a>
+          {%- if r.horizon and r.horizon != t.horizon %} <span class="tag">{{ r.horizon }}y</span>{% endif %}
+          {%- if r.all_passive %} <span class="tag">index products</span>{% endif %}</td>
+        <td>{{ r.bench }}</td>
+        <td class="n" data-v="{{ r.funds }}">{{ r.funds }}</td>
+        <td class="n" data-v="{{ r.median_cagr if r.median_cagr is not none else '' }}">{{ '%.1f'|format(r.median_cagr) if r.median_cagr is not none else '' }}</td>
+        <td class="n" data-v="{{ r.bench_cagr if r.bench_cagr is not none else '' }}">{{ '%.1f'|format(r.bench_cagr) if r.bench_cagr is not none else '' }}</td>
+        <td class="n {{ 'down' if r.excess is not none and r.excess|round(1) < 0 }}" data-v="{{ r.excess if r.excess is not none else '' }}">{{ '%+.1f'|format(r.excess) if r.excess is not none else '' }}</td>
+        <td class="n" data-v="{{ r.beat if r.beat is not none else '' }}">{{ '%.0f%%'|format(100 * r.beat) if r.beat is not none else '' }}</td>
+        <td class="n" data-v="{{ r.hit if r.hit is not none else '' }}">{{ '%.0f%%'|format(100 * r.hit) if r.hit is not none else '' }}</td>
+        <td class="n" data-v="{{ r.active_share if r.active_share is not none else '' }}">{{ '%.0f%%'|format(r.active_share) if r.active_share is not none else '' }}</td>
+        <td class="n {{ 'down' if r.selection is not none and r.selection|round(1) < 0 }}" data-v="{{ r.selection if r.selection is not none else '' }}">{{ '%+.1f'|format(r.selection) if r.selection is not none else '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endfor %}
+
+<h2>Reading the table</h2>
+<ul class="sub notes">
+  <li>Each category is measured against the benchmark its scheme documents name, or the nearest
+    series that is publicly served.
+    {% for g, names in benches.items() if names %}{{ g }}: {{ names|join(', ') }}{{ '; ' if not loop.last else '.' }}{% endfor %}</li>
+  <li>A median hides the spread. A category can lead at the median while its worst fund lags by five
+    points a year; the category pages show the whole distribution.</li>
+  <li>Survivorship bias runs the same way in every row: merged and wound-up funds are gone, so every
+    category looks a little better than it was.</li>
+</ul>
+<h2>What the columns cannot tell you</h2>
+<ul class="sub notes">
+  <li>Which fund to pick. The category medians differ by less than the funds within them do.</li>
+  <li>Whether the lead survives. Small and mid cap categories carry the mid-cap tilt of the period,
+    debt categories the rate cycle, commodities the rupee; the category pages separate what they can.</li>
+  <li>Past returns; not investment advice.</li>
+</ul>
+
+{% if sources %}
+<h2>Sources</h2>
+<ul class="sub notes">{% for s in sources %}
+  <li>{% if s.url %}<a href="{{ s.url }}" rel="noopener">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}{% if s.what %}: {{ s.what }}{% endif %}{% if s.retrieved %}, retrieved {{ s.retrieved }}{% endif %}</li>
+{% endfor %}</ul>
+{% endif %}
+{% endblock %}
+
+{% block tail %}<script src="/static/sort.js?v={{ static_version }}" defer></script>{% endblock %}

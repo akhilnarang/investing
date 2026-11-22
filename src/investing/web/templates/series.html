@@ -1,0 +1,35 @@
+{% extends "site_base.html" %}
+{% block title %}{{ meta.label }}{% endblock %}
+{% block body %}
+<h1>{{ meta.label }}</h1>
+<p class="sub">{{ meta.description or '' }}</p>
+
+{% if points %}
+<div class="hstack stat-row">
+  <div class="stat"><span class="big">{{ '%.4f'|format(points[-1].value) }}</span><span class="sub">on {{ points[-1].date }}</span></div>
+  {% if change is not none %}
+  <div class="stat"><span class="big {{ 'up' if change > 0 else ('down' if change < 0 else '') }}">{{ '%+.2f%%'|format(change) }}</span><span class="sub">over a year</span></div>
+  {% endif %}
+  <div class="stat"><span class="big">{{ '{:,}'.format(count) }}</span><span class="sub">points since {{ points[0].date }}</span></div>
+</div>
+
+{% if spark %}
+<svg class="spark" viewBox="0 0 700 140" preserveAspectRatio="none" role="img"
+     aria-label="{{ meta.label }} from {{ points[0].date }} to {{ points[-1].date }}">
+  <polyline points="{{ spark.points }}" fill="none" stroke="var(--blue)" stroke-width="1.5"/>
+</svg>
+<p class="sub"><span>{{ points[0].date }}</span> <span style="float:right">low {{ '%.4f'|format(spark.lo) }} · high {{ '%.4f'|format(spark.hi) }}</span></p>
+{% endif %}
+
+<h2>Recent</h2>
+<div class="scroll-x" data-cols="2"><table>
+  <thead><tr><th>Date</th><th class="n">Value</th></tr></thead>
+  <tbody>{% for p in recent %}
+    <tr><td>{{ p.date }}</td><td class="n">{{ '%.4f'|format(p.value) }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}
+<p class="empty">No data for this series.</p>
+{% endif %}
+{% if note %}<p class="sub">{{ note }}</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "site_base.html" %}
+{% block title %}{{ fund.name }}{% endblock %}
+{% block body %}
+<h1>{{ fund.name }}</h1>
+<p class="sub">{{ fund.fund_house or '' }}{% if fund.category %} ·
+  <a href="/mf?category={{ fund.category|urlencode }}">{{ fund.category }}</a>{% endif %}
+  {% if fund.plan %}<span class="tag">{{ fund.plan }} plan</span>{% endif %}
+  {% if fund.isin_growth %}<span class="tag">{{ fund.isin_growth }}</span>{% endif %}</p>
+{# Regular plans pay a distributor from the expense ratio, so their returns are lower. #}
+{% if sibling %}
+<p class="sub">Also sold as a <a href="/mf/{{ sibling.scheme_code }}">{{ sibling.plan }} plan</a>.
+  {% if fund.plan == 'direct' %}The regular plan is the same portfolio with a distributor commission
+  inside the expense ratio, so it returns less.{% else %}The direct plan is the same portfolio
+  without the distributor commission, so it returns more.{% endif %}</p>
+{% endif %}
+
+{% if returns %}
+<h2>Returns</h2>
+<div class="scroll-x" data-cols="{{ returns.windows|length + 3 }}"><table>
+  <thead><tr>{% for w in ('1w', '1m', '3m') %}<th class="n">{{ w }}</th>{% endfor %}
+    {% for w in returns.windows %}<th class="n">{{ w }}</th>{% endfor %}</tr></thead>
+  <tbody><tr>
+    {% for w in ('1w', '1m', '3m') %}
+      {% set v = returns.short.get(w) %}
+      <td class="n {{ 'up' if v and v > 0 else ('down' if v and v < 0 else '') }}">
+        {{ '%.2f%%'|format(v) if v is not none else '' }}</td>
+    {% endfor %}
+    {% for w in returns.windows %}
+      {% set v = returns.cagr[w] %}
+      <td class="n {{ 'up' if v and v > 0 else ('down' if v and v < 0 else '') }}">
+        {{ '%.2f%%'|format(v) if v is not none else '' }}</td>
+    {% endfor %}
+  </tr></tbody>
+</table></div>
+<p class="sub">As of {{ returns.as_of }}. 1w to 3m are plain returns; 6m and longer are annualised.
+  A window longer than the fund is left blank, never shown as zero.</p>
+{% endif %}
+
+{% if nav %}
+<h2>NAV</h2>
+<p><span class="big">{{ '%.4f'|format(nav.latest) }}</span> <span class="sub">on {{ nav.latest_date }}</span></p>
+<p class="sub">{{ nav.count }} observations from {{ nav.first_date }}.
+{% if nav.stale_days %}<strong>This scheme has not been priced since {{ nav.latest_date }}.</strong>
+It has most likely merged into another fund or matured, so the figures above describe a fund that no
+longer trades.{% endif %}</p>
+{% endif %}
+
+{% if portfolio %}
+<h2>Portfolio <span class="tag">{{ portfolio_date }}</span></h2>
+<div class="scroll-x" data-cols="4"><table>
+  <thead><tr><th>Security</th><th>Sector</th><th class="n">Weight</th><th class="n">Value (mn)</th></tr></thead>
+  <tbody>
+  {% for h in portfolio %}
+    <tr><td>{% if h.isin %}<a href="/stocks/{{ h.isin }}">{{ h.security_name }}</a>{% else %}{{ h.security_name }}{% endif %}
+        {% if h.side %}<span class="tag">{{ h.side }}</span>{% endif %}</td>
+        <td>{{ h.sector or '' }}</td>
+        <td class="n">{{ '%.2f%%'|format(h.weight) if h.weight is not none else '' }}</td>
+        <td class="n">{{ '%.1f'|format(h.value) if h.value is not none else '' }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if other_dates %}
+<p class="sub">Also disclosed: {% for d in other_dates %}<a href="/mf/{{ fund.scheme_code }}?on={{ d }}">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+{% endif %}
+{% endif %}
+{% endblock %}

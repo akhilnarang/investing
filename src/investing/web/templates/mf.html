@@ -1,0 +1,50 @@
+{% extends "site_base.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Mutual funds{% endblock %}
+{% block body %}
+<h1>Mutual funds</h1>
+<p class="sub">{{ stats.funds }} schemes. Search by fund name or by category, or pick one below.</p>
+{# data-live hooks up _live_search.html; without it this is a plain GET form. #}
+<form action="/mf" method="get" data-live>
+  <input class="search" type="search" name="q" value="{{ (q if not category else '') or '' }}"
+         placeholder="Parag Parikh, HDFC Flexi Cap, arbitrage, gilt..." autofocus autocomplete="off" aria-controls="results">
+  <noscript><button class="button" type="submit">Search</button></noscript>
+</form>
+{# The live search swaps this element's contents, so everything that depends on the query lives inside it. #}
+<div id="results" aria-live="polite">
+{% if q and q|trim|length >= 2 %}
+  <h2>{{ results|length }} match{{ '' if results|length == 1 else 'es' }}</h2>
+  {% if plan %}<p class="sub">{{ plan }} plans only.
+    <a href="/mf?{% if category %}category={{ category|urlencode }}{% else %}q={{ q|urlencode }}{% endif %}">show both plans</a></p>{% endif %}
+  {% if results %}
+  {# The Category column only for a name search. #}
+  <div class="scroll-x" data-cols="{{ 3 if category else 4 }}"><table>
+    <thead><tr><th>Scheme</th><th>House</th>{% if not category %}<th>Category</th>{% endif %}<th>Plan</th></tr></thead>
+    <tbody>
+    {% for f in results %}
+      <tr><td><a href="/mf/{{ f.scheme_code }}">{{ f.name }}</a></td>
+          <td>{{ f.fund_house or '' }}</td>{% if not category %}<td>{{ f.category or '' }}</td>{% endif %}
+          <td>{% if grouped %}{% for p, code in f.plans.items() %}<a href="/mf/{{ code }}">{{ p }}</a>{{ ' · ' if not loop.last }}{% endfor %}{% else %}{{ f.plan or '' }}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="empty">Nothing matched.</p>{% endif %}
+{% elif q %}
+  <p class="empty">Type at least 2 characters.</p>
+{% else %}
+  <h2>Categories</h2>
+  <p class="sub">Scheme counts, not plan counts: every scheme is sold as a direct and a regular plan,
+    and the two are one row.</p>
+  <div class="scroll-x" data-cols="3"><table>
+    <thead><tr><th>Category</th><th class="n">Schemes</th><th>Plans</th></tr></thead>
+    <tbody>
+    {% for c in categories %}
+      <tr><td><a href="/mf?category={{ c.category|urlencode }}">{{ c.category }}</a></td>
+          <td class="n">{{ c.schemes }}</td>
+          <td>{% for p in c.plans %}<a href="/mf?category={{ c.category|urlencode }}&plan={{ p }}">{{ p }}</a>{{ ' · ' if not loop.last }}{% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+{% endif %}
+</div>
+{% endblock %}
+{% block tail %}{% include "_live_search.html" %}{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "site_base.html" %}
+{% block title %}Your Coin portfolio{% endblock %}
+{% block head %}<meta name="description" content="Load your Zerodha Coin mutual-fund tradebook and see, in your browser, how every SIP and lump sum did against the fund's benchmark, its category peers, inflation and the direct plan. Nothing is uploaded.">{% endblock %}
+{% block body %}
+<h1>Your Coin portfolio, against the funds you could have held</h1>
+<p class="sub">Load the mutual-fund tradebook from Zerodha Console. Every purchase is replayed, rupee for
+  rupee on the same day, into the fund's benchmark index, into every peer in its category on this site,
+  into inflation, and into the direct plan if you hold the regular one.</p>
+
+<section id="upload" class="pf-upload">
+  <label class="pf-drop" id="drop">
+    <input type="file" id="file" accept=".csv,text/csv" multiple>
+    <b>Choose tradebook CSV files, or drop them here</b>
+    <span>One file per financial year is fine; choose them together. Rows repeated across files are counted once.</span>
+  </label>
+  <p class="pf-private"><b>Your file stays in this browser.</b> It is read by JavaScript on this page and
+    never uploaded, sent or stored: the page only downloads public data (the ISIN map, NAV histories and
+    benchmark values), and those requests carry a scheme code or an index name, nothing from your file.</p>
+  <div class="pf-status" id="status" aria-live="polite"></div>
+  <button class="button ghost small" id="reset" type="button" hidden>Start over</button>
+  <ol class="notes">
+    <li>Open <a href="https://console.zerodha.com/reports/tradebook" rel="noopener">Console, Reports, Tradebook</a>.</li>
+    <li>Choose the <b>Mutual funds</b> segment and a date range from your first purchase. Console limits a range to one financial year, so download each year.</li>
+    <li>Download as CSV and choose the files above.</li>
+  </ol>
+</section>
+
+<div class="stat-row pf-kpis" id="kpis"></div>
+
+<section id="results" hidden>
+  <h2 id="positions">Positions</h2>
+  <p class="sub">Click a fund for the full comparison. Untick a fund to leave it out of every figure on the
+    page (an emergency fund, say). Invested is the cost of the units still held; XIRR uses every buy and sell
+    in the tradebook. Best in category is the peer that would have given the most with your exact buys and
+    sells, with hindsight. Click a column heading to sort.</p>
+  <div class="scroll-x"><table id="pos"></table></div>
+  <details id="closed-box" hidden><summary id="closed-sum">Closed positions</summary>
+    <div class="scroll-x"><table id="closed"></table></div>
+    <p class="sub">Funds you have sold out of. Their buys and sells count in the portfolio XIRR; realised is what the sells returned.</p>
+  </details>
+  <div id="warnings"></div>
+
+  <h2 id="growth">Portfolio value over time</h2>
+  <p class="sub">Month-end values of the units you held, against the same money in each fund's benchmark index.</p>
+  <div class="pf-chart" id="growth-chart"></div><div class="pf-legend" id="growth-legend"></div>
+
+  <h2 id="compare">Everything you invested, in a fund of your choice</h2>
+  <p class="sub">Pick any of your funds, or all of them, and any fund or index: every buy and sell you made
+    in the chosen funds is replayed rupee for rupee on the same days into the pick, withdrawals included. The
+    rest of your portfolio stays as it is.</p>
+  <div class="pills" id="scope" role="group" aria-label="Which holdings to replay"></div>
+  <div class="pf-pick">
+    <input type="search" id="pick" class="search" placeholder="Search any fund or index" aria-label="Search a fund or index to compare with" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pick-menu" aria-autocomplete="list">
+    <div class="pf-menu" id="pick-menu" hidden role="listbox"></div>
+  </div>
+  <div class="pf-chips" id="chips"></div>
+  <div class="scroll-x" id="cmp-card" hidden><table id="cmp"></table></div>
+  <p class="sub" id="cmp-note"></p>
+</section>
+
+<h2 id="how">How this is computed</h2>
+<ul class="notes">
+  <li><b>Positions</b> are rebuilt from the tradebook: buys add units at the NAV in the file, sells remove the oldest units first (FIFO). A sell larger than the units held is reported, not silently clipped; it usually means a year's file is missing.</li>
+  <li><b>Value</b> is units held times the fund's latest NAV, and every comparison for that fund is closed on the same day. A fund whose NAV is more than a week behind the valuation date is flagged.</li>
+  <li><b>XIRR</b> is the annualised money-weighted return of every buy (out), every sell (in) and the current value (in), the definition Coin and Console use.</li>
+  <li><b>Benchmark and peers</b>: each rupee you invested on a day buys that day's value of the index or the peer's NAV (the next available day when the day had none), and each sell removes the same fraction of units you sold. Peers are the funds on this site's <a href="/compare">category comparison</a> for the same plan; a peer younger than your first purchase cannot be replayed and is left out.</li>
+  <li><b>Beat index, last 5 years</b> counts the completed calendar years in which the fund's NAV return beat its benchmark's, independent of your cash flows. For an index fund or ETF it shows the average lag behind its own index instead.</li>
+  <li><b>Benchmarks</b> are the ones the category pages use. Funds on the S&amp;P 500, the Nasdaq-100 or the US total market are measured against that index in rupees, an index fund against the Nifty index it tracks, and an equity fund outside every category against the Nifty 500 TRI. Inflation is India's CPI.</li>
+  <li><b>Not modelled</b>: IDCW payouts (the tradebook has no dividend rows, so an IDCW plan's return is understated), exit loads, taxes, and STP or switch legs, which Coin books as sells and buys. Nothing here is advice.</li>
+</ul>
+
+<dialog class="pf-drawer" id="drawer" aria-labelledby="drawer-title"><div id="drawer-inner"></div></dialog>
+{% endblock %}
+{% block tail %}<script src="/static/portfolio.js?v={{ js_version }}" defer></script>{% endblock %}

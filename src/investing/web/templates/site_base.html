@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% filter trim %}{% block title %}{% endblock %}{% endfilter %} · investing</title>
+<link rel="stylesheet" href="/static/site.css?v={{ static_version }}">
+{# Per-page <head> content, such as a report's canonical link and OpenGraph tags. #}
+{% block head %}{% endblock %}
+</head>
+<body>
+<header>
+  <a class="brand" href="/">investing</a>
+  <nav>
+    <a href="/mf"{% if section == 'mf' %} class="on"{% endif %}>funds</a>
+    <a href="/compare"{% if section == 'compare' %} class="on"{% endif %}>compare</a>
+    <a href="/index-funds"{% if section == 'index-funds' %} class="on"{% endif %}>index</a>
+    <a href="/stocks"{% if section == 'stocks' %} class="on"{% endif %}>stocks</a>
+    <a href="/sif"{% if section == 'sif' %} class="on"{% endif %}>sif</a>
+    <a href="/slb"{% if section == 'slb' %} class="on"{% endif %}>slb</a>
+    <a href="/currency"{% if section == 'currency' %} class="on"{% endif %}>currency</a>
+    <a href="/summary"{% if section == 'summary' %} class="on"{% endif %}>summary</a>
+    <a href="/portfolio"{% if section == 'portfolio' %} class="on"{% endif %}>portfolio</a>
+    <a href="/ipo"{% if section == 'ipo' %} class="on"{% endif %}>ipo</a>
+  </nav>
+</header>
+<main>
+{% block body %}{% endblock %}
+</main>
+{% block tail %}{% endblock %}
+<footer>
+  <span>{% if stats is defined %}{{ stats.funds }} funds · {{ stats.stocks }} stocks · {{ stats.portfolios }} portfolios{% endif %}</span>
+  <span><a href="/docs">api</a> · <a href="https://github.com/akhilnarang/investing">source</a></span>
+</footer>
+</body>
+</html>

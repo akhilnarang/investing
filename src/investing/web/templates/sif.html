@@ -1,0 +1,204 @@
+{% extends "site_base.html" %}
+{% block title %}{% if d %}{{ d.name }} · {% endif %}SIF launch tracker{% endblock %}
+{% macro pct(v, d=1) %}{{ ('%.' ~ d ~ 'f')|format(v) if v is not none else '' }}{% endmacro %}
+{% macro sign(v) %}{{ 'down' if v is not none and v < 0 else '' }}{% endmacro %}
+{% block body %}
+<h1>Specialised Investment Funds: a launch tracker</h1>
+<p class="sub">SEBI's SIF category began in 2025: long-short strategies with a ₹10 lakh minimum per investor,
+  run by mutual fund houses. {% if not t.any_year_old %}None is a year old yet, so this{% else %}Few are
+  a year old, so this{% endif %} is a watchlist of what has launched and how it has started, not a
+  comparison. NAVs, launch dates and returns are computed from AMFI's SIF NAV history{% if t.as_of %}, to
+  {{ t.as_of.strftime('%d %b %Y') }}{% endif %}; returns this short are noise and are shown so you can see
+  them, not act on them.</p>
+
+{% if t.funds %}
+<div class="hstack stat-row">
+  <div class="stat"><span class="big">{{ t.funds|length }}</span><span class="sub">SIFs with a direct growth plan on AMFI's register</span></div>
+  {% if t.oldest %}<div class="stat"><span class="big">{{ t.oldest.launch.strftime('%b %Y') }}</span>
+    <span class="sub">earliest launch, {{ t.oldest.age_days // 30 }} months ago</span></div>{% endif %}
+  {% if t.ter.median is not none %}<div class="stat"><span class="big">{{ '%.2f'|format(t.ter.median) }}%</span>
+    <span class="sub">median expense ratio of the {{ t.ter.n }} Kuvera lists, {{ '%.2f'|format(t.ter.lo) }} to {{ '%.2f'|format(t.ter.hi) }}</span></div>{% endif %}
+  {% if t.net.median is not none %}<div class="stat"><span class="big">{{ '%.0f'|format(t.net.median) }}%</span>
+    <span class="sub">median net exposure of the {{ t.net.n }} with a portfolio, {{ '%.0f'|format(t.net.lo) }}% to {{ '%.0f'|format(t.net.hi) }}%</span></div>{% endif %}
+</div>
+{% endif %}
+
+{% if d %}
+<section class="sif-detail" id="fund">
+  <div class="hstack justify-between">
+    <h2>{{ d.name }}</h2>
+    <span class="hstack">
+      {% if d.prev %}<a href="/sif?fund={{ d.prev }}#fund" rel="prev">previous</a>{% endif %}
+      {% if d.next %}<a href="/sif?fund={{ d.next }}#fund" rel="next">next</a>{% endif %}
+      <a href="/sif#launches">close</a>
+    </span>
+  </div>
+  <p class="sub">{{ d.house }} · {{ d.strategy }} · launched {{ d.launch.strftime('%d %b %Y') }} ·
+    <a href="/mf/{{ d.code }}">fund page</a></p>
+
+  <div class="hstack stat-row">
+    <div class="stat"><span class="big {{ sign(d.since) }}">{{ '%+.1f'|format(d.since) }}%</span>
+      <span class="sub">since launch{% if d.since_annualised is not none %}, {{ '%.1f'|format(d.since_annualised) }}% a year{% endif %}</span></div>
+    <div class="stat"><span class="big">{{ '%.2f'|format(d.nav) }}</span><span class="sub">NAV on {{ d.nav_date.strftime('%d %b %Y') }}</span></div>
+    <div class="stat"><span class="big">{{ pct(d.exposure.net_pct, 0) ~ '%' if d.exposure else 'n/a' }}</span>
+      <span class="sub">{{ 'net exposure, long minus short' if d.exposure else 'net exposure: no portfolio yet' }}</span></div>
+    {% if d.drawdown is not none %}<div class="stat"><span class="big">{{ '%.1f'|format(-d.drawdown) }}%</span>
+      <span class="sub">deepest fall from a peak, to {{ d.drawdown_day.strftime('%d %b %Y') }}</span></div>{% endif %}
+  </div>
+
+  <h3>NAV since launch</h3>
+  <p class="sub">Rebased to 100 on the first day. {{ d.nav_points }} daily NAVs from AMFI's SIF feed{% if d.drawdown is not none %};
+    it fell {{ '%.1f'|format(-d.drawdown) }}% from its peak on {{ d.drawdown_from.strftime('%d %b %Y') }} to
+    {{ d.drawdown_day.strftime('%d %b %Y') }}, its deepest drop so far{% endif %}.</p>
+  {% if spark %}
+  <svg class="spark" viewBox="0 0 700 140" preserveAspectRatio="none" role="img"
+       aria-label="NAV rebased to 100, from {{ d.launch }} to {{ d.nav_date }}, ending at {{ '%.1f'|format(d.points[-1].value) }}">
+    <polyline points="{{ spark.points }}" fill="none" stroke="var(--blue)" stroke-width="1.5"/>
+  </svg>
+  <p class="sub">low {{ '%.1f'|format(spark.lo) }} · high {{ '%.1f'|format(spark.hi) }} · now {{ '%.1f'|format(d.points[-1].value) }}</p>
+  {% else %}<p class="empty">Too few NAVs to draw a line yet.</p>{% endif %}
+
+  <div class="sif-two">
+    <div>
+      <h3>Returns</h3>
+      <dl class="sif-dl">
+        {% for w, label in [('1m', '1 month'), ('3m', '3 months'), ('6m', '6 months'), ('1y', '1 year')] %}
+        <dt>{{ label }}</dt><dd class="{{ sign(d.returns[w]) }}">{{ pct(d.returns[w]) ~ '%' if d.returns[w] is not none else 'n/a' }}</dd>
+        {% endfor %}
+        <dt>Since launch</dt><dd class="{{ sign(d.since) }}">{{ '%.1f'|format(d.since) }}%</dd>
+        <dt>Best day</dt><dd>{{ '%+.2f%% on %s'|format(d.best[0], d.best[1].strftime('%d %b %Y')) if d.best else 'n/a' }}</dd>
+        <dt>Worst day</dt><dd>{{ '%+.2f%% on %s'|format(d.worst[0], d.worst[1].strftime('%d %b %Y')) if d.worst else 'n/a' }}</dd>
+        <dt>Days finishing up</dt><dd>{% if d.move_days %}{{ d.up_days }} of {{ d.move_days }} ({{ '%.0f'|format(d.up_days / d.move_days * 100) }}%){% else %}n/a{% endif %}</dd>
+        <dt>Volatility</dt><dd>{{ pct(d.volatility) ~ '%' if d.volatility is not none else 'n/a' }}</dd>
+      </dl>
+      <p class="sub">Simple percentages over each window, not annualised. Windows longer than the fund's life are blank.</p>
+    </div>
+    <div>
+      <h3>Terms</h3>
+      <dl class="sif-dl">
+        <dt>Expense ratio</dt><dd>{% if d.ter is not none %}{{ '%.2f'|format(d.ter) }}% (Kuvera{{ ', ' ~ d.ter_date if d.ter_date }}){% else %}n/a{% endif %}</dd>
+        <dt>AUM</dt><dd>{{ '₹{:,.0f} cr'.format(d.aum) if d.aum else 'n/a' }}</dd>
+        <dt>Lock-in</dt><dd>{{ (d.lock_in_days ~ ' days') if d.lock_in_days else ('None' if d.lock_in_days == 0 else 'n/a') }}</dd>
+        <dt>Manager</dt><dd>{{ d.manager or 'n/a' }}</dd>
+        <dt>Category</dt><dd>{{ d.category or d.strategy }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Exposure</h3>
+  {% if d.exposure %}{% set e = d.exposure %}
+  <dl class="sif-dl">
+    <dt>Long equity</dt><dd>{{ pct(e.long_equity_pct, 0) }}%</dd>
+    <dt>Long derivatives</dt><dd>{{ pct(e.long_derivatives_pct, 0) }}%</dd>
+    <dt>Short</dt><dd>{{ pct(e.short_pct, 0) }}%</dd>
+    <dt>Cash and equivalents</dt><dd>{{ '%.0f'|format(d.cash) }}%</dd>
+    <dt>Net exposure</dt><dd>{{ pct(e.net_pct, 0) }}%</dd>
+    <dt>Gross exposure</dt><dd>{{ pct(e.gross_pct, 0) }}%</dd>
+    <dt>Stocks held long</dt><dd>{{ e.equity_holdings }}</dd>
+    <dt>Largest position</dt><dd class="{{ 'down' if d.big }}">{{ pct(d.concentration.top_pct) }}%{% if d.biggest %} {{ d.biggest }}{% endif %}</dd>
+    <dt>Largest five</dt><dd>{{ pct(d.concentration.top5_pct, 0) }}%</dd>
+    <dt>Portfolio dated</dt><dd>{{ d.portfolio_date }}{% if d.stale_days %}, {{ d.stale_days }} days ago{% endif %}</dd>
+  </dl>
+  {% if d.big %}<p class="sub"><b>{{ '%.0f'|format(d.concentration.top_pct) }}% of the fund sits in {{ d.biggest }}.</b>
+    A position this size moves the NAV on its own: a 10% day in it is {{ '%.1f'|format(d.concentration.top_pct / 10) }}% of the fund.</p>{% endif %}
+  {% if d.stale_days %}<p class="sub">These weights are {{ d.stale_days }} days old, so they describe what the
+    fund held on {{ d.portfolio_date }} and not what it holds now. A position bought or listed since
+    then does not appear at all, and one that has run since is understated: weights move with price, not
+    only with trading. Fund houses publish a portfolio monthly, about a fortnight after the month ends.</p>{% endif %}
+  <p class="sub">Long is equity plus bought derivatives, short is sold futures and written options; futures
+    count at notional, options only at premium, so option-hedged books look less short than they are.</p>
+  {% else %}<p class="empty">No portfolio published yet, so no exposure figures. Kuvera lists a portfolio for
+    some SIFs about a month after each month-end.</p>
+  {% endif %}
+
+  {% if d.sectors %}
+  <h3>Net exposure by sector</h3>
+  <p class="sub">Longs minus shorts in each sector, in % of assets. Derivative legs sit under the underlying's
+    sector where the fund also holds the stock.</p>
+  <div class="scroll-x" data-cols="2"><table>
+    <tbody>{% for name, net in d.sectors %}
+      <tr><td>{{ name }}</td><td class="n {{ sign(net) }}">{{ '%+.1f'|format(net) }}%</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
+  {% for title, rows in [('Longs', d.longs), ('Shorts', d.shorts)] if rows %}
+  <h3>{{ title }} ({{ rows|selectattr('counted')|list|length }}{% if rows|rejectattr('counted')|list %} + {{ rows|rejectattr('counted')|list|length }} debt and other{% endif %})</h3>
+  <div class="scroll-x sif-book" data-cols="3"><table>
+    <thead><tr><th>Position</th><th>Sector</th><th class="n">% of assets</th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr><td>{{ r.name }}{% if r.asset_class == 'derivative' %}<span class="tag">deriv</span>{% elif not r.counted %}<span class="tag" title="outside the long and short figures: only equity and derivative positions are counted">{{ r.asset_class }}</span>{% endif %}</td>
+          <td>{{ r.sector or '' }}</td><td class="n">{{ '%.2f'|format(r.weight) }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% endfor %}
+  {% if d.paired %}<p class="sub">{{ 'One position is' if d.paired|length == 1 else d.paired|length ~ ' positions are' }}
+    held on both sides ({{ d.paired[:4]|join(', ') }}{{ ' and others' if d.paired|length > 4 }}): the fund owns the
+    stock and has sold its future, which locks in the spread between the two rather than betting on the price.</p>{% endif %}
+  <p class="sub">NAVs and launch date: AMFI SIF feed.{% if d.portfolio_date %} Portfolio, exposure and terms:
+    Kuvera, {{ d.portfolio_date }}.{% endif %}</p>
+</section>
+{% endif %}
+
+<h2 id="launches">Every SIF, newest first</h2>
+<p class="sub">Returns are simple percentages over the window, not annualised, computed from AMFI's daily
+  NAVs; since-launch is annualised only once a fund is a year old. Net is long minus short, in % of AUM,
+  from the latest disclosed portfolio. Pick a fund for its NAV path and its whole book. Red is below zero.</p>
+{% if t.funds %}
+{% set cols = 14 + (1 if t.have_1y else 0) %}
+<div class="scroll-x sif-table" data-cols="{{ cols }}"><table data-sortable>
+  <thead><tr><th data-key="name">Fund</th><th data-key="house" class="opt">AMC</th><th data-key="strategy">Strategy</th>
+    <th data-key="age">Launched</th><th class="n" data-key="since">Since launch</th>
+    <th class="n" data-key="r6">6m</th><th class="n" data-key="r3">3m</th><th class="n opt" data-key="r1">1m</th>
+    {% if t.have_1y %}<th class="n" data-key="r12">1y</th>{% endif %}
+    <th class="n" data-key="ter">TER</th><th class="n" data-key="net">Net</th><th class="n" data-key="gross">Long / Short</th>
+    <th class="n opt" data-key="aum">AUM Cr</th><th class="n opt" data-key="nav">NAV</th><th class="opt" data-key="manager">Manager</th></tr></thead>
+  <tbody>{% for f in t.funds %}{% set e = f.exposure %}
+    <tr{% if d and d.code == f.code %} class="on"{% endif %}>
+      <td><a href="/sif?fund={{ f.code }}#fund">{{ f.name }}</a>
+        {% if e %}<div class="sif-pf">net {{ '%.0f'|format(e.net_pct) }}% · {{ e.equity_holdings }} longs, {{ f.shorts }} shorts{% if (f.concentration.top_pct or 0) >= 10 and f.biggest %} · <b>{{ '%.0f'|format(f.concentration.top_pct) }}% in {{ f.biggest }}</b>{% endif %}</div>{% endif %}</td>
+      <td class="opt">{{ f.house }}</td>
+      <td>{{ f.strategy }}</td>
+      <td data-v="{{ f.age_days }}" title="Launched {{ f.launch }}">{{ f.launch.strftime('%b %Y') }} · {{ f.age_days // 30 }} mo</td>
+      <td class="n {{ sign(f.since) }}" data-v="{{ f.since }}">{{ pct(f.since) }}%{% if f.since_annualised is not none %} ({{ pct(f.since_annualised) }}% a yr){% endif %}</td>
+      {% for w in (['6m', '3m', '1m'] + (['1y'] if t.have_1y else [])) %}{% set v = f.returns[w] %}
+      <td class="n {{ sign(v) }}{{ ' opt' if w == '1m' }}" data-v="{{ v if v is not none else '' }}">{{ pct(v) }}</td>{% endfor %}
+      <td class="n" data-v="{{ f.ter if f.ter is not none else '' }}" title="{{ 'per Kuvera, as of ' ~ f.ter_date if f.ter is not none else 'not listed on Kuvera' }}">{{ pct(f.ter, 2) }}</td>
+      <td class="n {{ sign(e.net_pct if e else none) }}" data-v="{{ e.net_pct if e else '' }}">{{ pct(e.net_pct, 0) if e else '' }}</td>
+      <td class="n" data-v="{{ e.gross_pct if e else '' }}" title="{{ 'long / short, %% of AUM; gross %.0f%%'|format(e.gross_pct) if e else 'no portfolio on Kuvera' }}">{{ ('%.0f / -%.0f'|format(e.long_pct, e.short_pct)) if e else '' }}</td>
+      <td class="n opt" data-v="{{ f.aum or '' }}">{{ '{:,.0f}'.format(f.aum) if f.aum else '' }}</td>
+      <td class="n opt" data-v="{{ f.nav }}">{{ '%.2f'|format(f.nav) }}</td>
+      <td class="opt">{{ f.manager or '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty">No SIF data loaded.</p>{% endif %}
+
+<h2>What a SIF is</h2>
+<ul class="sub notes">
+  <li>A SEBI category between mutual funds and PMS: fund houses may run long-short and other strategies
+    mutual funds cannot, with a ₹10 lakh minimum per investor (per AMC) and daily or periodic liquidity
+    depending on the strategy.</li>
+  {% if t.strategies %}<li>Strategies here: {% for s, n in t.strategies %}{{ s }} {{ n }}{{ ', ' if not loop.last else '.' }}{% endfor %}</li>{% endif %}
+  <li>Net exposure is what makes a long-short fund different from a mutual fund. A fund 80% long and 10%
+    short is net 70% long: it will move roughly like 70% of an equity fund. A fund at 37% long and 35%
+    short is close to market-neutral and its return is mostly the spread between what it bought and what
+    it sold, plus the cash yield.</li>
+  <li>They are not benchmarked on this page. A hybrid long-short strategy against the Nifty 500 total
+    return index would tell you nothing; when the first cohort passes three years a proper comparison
+    can follow.</li>
+</ul>
+<h2>Where the numbers come from</h2>
+<ul class="sub notes">
+  <li><a href="https://www.amfiindia.com/sif/latest-nav/nav-history">AMFI's SIF NAV history</a>: daily NAVs
+    of every SIF from its first day. Launch dates and every return here are computed from them. SIFs are
+    absent from AMFI's NAVAll and from mfapi.in.</li>
+  <li><a href="https://www.amfiindia.com/sif/latest-nav">AMFI's SIF register</a>: the plans, their ISINs and
+    strategy categories. The fund house is the one AMFI files the same ISIN issuer's ordinary schemes under.</li>
+  <li><a href="https://kuvera.in/mutual-funds">Kuvera</a>, for the {{ t.net.n }} SIFs it lists: the dated expense
+    ratio, AUM, manager and the month-end portfolio from which long, short and net exposure are derived.
+    The rest show blanks until Kuvera or the AMC publishes them.</li>
+  <li>Past returns only, and very short ones. Not investment advice.</li>
+</ul>
+{% endblock %}
+
+{% block tail %}<script src="/static/sort.js?v={{ static_version }}" defer></script>{% endblock %}

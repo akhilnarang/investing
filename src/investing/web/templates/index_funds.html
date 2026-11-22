@@ -1,0 +1,37 @@
+{% extends "site_base.html" %}
+{% block title %}Index funds: tracking difference and cost{% endblock %}
+{% block body %}
+<h1>Index funds</h1>
+<p class="sub">How much of the index you actually get. Tracking difference is the fund's return
+  minus the index's over the same window, so a number near zero is a good tracker and a negative one
+  is the cost of holding it. As of {{ doc.as_of }}.</p>
+
+{% for key, ix in indexes %}
+<h2>{{ ix.label }} <span class="tag">{{ ix.count }} funds</span></h2>
+{# Fund, House, a CAGR and a diff per horizon, BER, AUM. #}
+<div class="scroll-x" data-cols="{{ horizons|length * 2 + 4 }}"><table>
+  <thead><tr><th>Fund</th><th>House</th>
+    {% for h in horizons %}<th class="n">{{ h }}y CAGR</th><th class="n">{{ h }}y diff</th>{% endfor %}
+    <th class="n" title="Base expense ratio from AMFI; Groww's total expense ratio where AMFI's name does not match">BER</th><th class="n">AUM Cr</th></tr></thead>
+  <tbody>
+    <tr><td colspan="2"><strong>{{ ix.index_name or ix.label }}</strong></td>
+      {% for h in horizons %}
+        <td class="n"><strong>{{ '%.2f%%'|format(ix.index_cagr[h|string]) if ix.index_cagr and ix.index_cagr.get(h|string) is not none else '' }}</strong></td>
+        <td class="n"></td>
+      {% endfor %}
+      <td class="n"></td><td class="n"></td></tr>
+  {% for f in ix.funds %}
+    <tr><td><a href="/mf/{{ f.scheme_code }}">{{ f.short or f.name }}</a></td>
+        <td>{{ f.fund_house or '' }}</td>
+        {% for h in horizons %}
+          {% set c = (f.cagr or {}).get(h|string) %}
+          {% set t = (f.td or {}).get(h|string) %}
+          <td class="n">{{ '%.2f%%'|format(c) if c is not none else '' }}</td>
+          <td class="n {{ 'down' if t is not none and t < -1 }}">{{ '%.2f%%'|format(t) if t is not none else '' }}</td>
+        {% endfor %}
+        <td class="n">{{ '%.2f'|format(f.ber) if f.get('ber') is not none else '' }}</td>
+        <td class="n">{{ '{:,.0f}'.format(f.aum_cr) if f.aum_cr else '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endfor %}
+{% endblock %}

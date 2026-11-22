@@ -1,0 +1,16 @@
+{% extends "site_base.html" %}
+{% block title %}Indian investing data{% endblock %}
+{% block body %}
+<h1>Indian investing data</h1>
+<p class="sub">Mutual funds, stocks, currencies and IPO prospectuses, from one database.</p>
+<div class="cards">
+  <a class="card" href="/mf"><h3>Mutual funds</h3><p>{{ stats.funds }} schemes, NAV history back to {{ stats.first_nav }}, disclosed portfolios and returns.</p></a>
+  <a class="card" href="/compare"><h3>Category comparisons</h3><p>Every fund in a category over its longest common history, against the index it is measured by.</p></a>
+  <a class="card" href="/index-funds"><h3>Index funds</h3><p>How much of the index each tracker actually delivers, after its expenses.</p></a>
+  <a class="card" href="/stocks"><h3>Stocks</h3><p>{{ stats.stocks }} listed companies with closes, corporate actions, and every fund that holds them.</p></a>
+  <a class="card" href="/sif"><h3>Specialised Investment Funds</h3><p>{{ stats.sifs }} SIFs with their long and short books.</p></a>
+  <a class="card" href="/currency"><h3>Currencies and metals</h3><p>Rupee pairs, the dollar index, gold and silver, inflation.</p></a>
+  <a class="card" href="/ipo"><h3>IPOs</h3><p>Prospectus analysis with page-level evidence, and allotment lookup.</p></a>
+  <a class="card" href="/docs"><h3>API</h3><p>Everything here is a JSON endpoint too.</p></a>
+</div>
+{% endblock %}

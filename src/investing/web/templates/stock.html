@@ -1,0 +1,73 @@
+{% extends "site_base.html" %}
+{% block title %}{{ stock.name }}{% if stock.symbol %} ({{ stock.symbol }}){% endif %}{% endblock %}
+{% block body %}
+<h1>{{ stock.name }}</h1>
+<p class="sub">{{ stock.symbol or '' }} <span class="tag">{{ stock.isin }}</span></p>
+
+{% if prices %}
+<p><span class="big">{{ '%.2f'|format(prices.latest) }}</span> <span class="sub">on {{ prices.latest_date }}</span></p>
+<p class="sub">{{ '{:,}'.format(prices.count) }} closes from {{ prices.first_date }}.</p>
+{% endif %}
+
+<h2>Who holds it</h2>
+{% if ownership %}
+<p class="sub">Disclosed mutual fund holdings. The join this site exists for.</p>
+<div class="hstack stat-row">
+  <div class="stat"><span class="big">{{ '{:,.0f}'.format(latest.value_cr) }}</span><span class="sub">₹ crore held</span></div>
+  <div class="stat"><span class="big">{{ latest.funds }}</span><span class="sub">funds</span></div>
+  {% if latest.top %}
+  <div class="stat"><span class="big">{{ '%.2f%%'|format(latest.top.weight) }}</span><span class="sub">top weight, {{ latest.top.fund_house or latest.top.fund_name }}</span></div>
+  {% endif %}
+  {% if latest.change is not none %}
+  <div class="stat"><span class="big {{ 'up' if latest.change > 0 else ('down' if latest.change < 0 else '') }}">{{ '%+d'|format(latest.change) }}</span><span class="sub">funds since {{ latest.previous }}</span></div>
+  {% endif %}
+</div>
+
+<div class="pills">
+{% for o in ownership %}<a href="/stocks/{{ stock.isin }}?on={{ o.date }}"{% if o.date == on %} class="on"{% endif %}>{{ o.date }}</a>{% endfor %}
+</div>
+
+{% if holders %}
+<h2>{{ holders|length }} holders on {{ on }}
+  <a class="tag" href="/stocks/{{ stock.isin }}?on={{ on }}&amp;by={{ 'weight' if by == 'value' else 'value' }}">sort by {{ 'conviction' if by == 'value' else 'value' }}</a></h2>
+<div class="scroll-x" data-cols="5"><table>
+  <thead><tr><th>Fund</th><th>House</th><th>Category</th>
+    <th class="n">Weight{{ ' ↓' if by == 'weight' }}</th>
+    <th class="n">₹ Cr{{ ' ↓' if by == 'value' }}</th></tr></thead>
+  <tbody>{% for h in holders %}
+    <tr><td><a href="/mf/{{ h.scheme_code }}">{{ h.fund_name or h.scheme_code }}</a>
+            {% if h.side %}<span class="tag">{{ h.side }}</span>{% endif %}</td>
+        <td>{{ h.fund_house or '' }}</td>
+        <td>{{ h.category or '' }}</td>
+        <td class="n">{{ '%.2f%%'|format(h.weight) if h.weight is not none else '' }}</td>
+        <td class="n">{{ '{:,.0f}'.format(h.value / 10) if h.value is not none else '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+{% if houses %}
+<h2>By fund house</h2>
+<div class="scroll-x" data-cols="3"><table>
+  <thead><tr><th>House</th><th class="n">Funds</th><th class="n">₹ Cr</th></tr></thead>
+  <tbody>{% for h in houses %}
+    <tr><td>{{ h.fund_house or 'unknown' }}</td><td class="n">{{ h.funds }}</td>
+        <td class="n">{{ '{:,.0f}'.format(h.value_cr) }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% else %}
+<p class="empty">No disclosed fund holdings of this security.</p>
+{% endif %}
+
+{% if actions %}
+<h2>Corporate actions</h2>
+<div class="scroll-x" data-cols="4"><table>
+  <thead><tr><th>Date</th><th>Kind</th><th class="n">Ratio</th><th class="n">Amount</th></tr></thead>
+  <tbody>{% for a in actions %}
+    <tr><td>{{ a.date }}</td><td>{{ a.kind }}</td>
+        <td class="n">{{ a.ratio if a.ratio is not none else '' }}</td>
+        <td class="n">{{ a.amount if a.amount is not none else '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}
